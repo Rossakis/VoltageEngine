@@ -54,7 +54,7 @@ namespace Nez
 		/// </summary>
 		public static float MaxDeltaTime = float.MaxValue;
 
-		internal static void Update(float dt)
+		public static void Update(float dt)
 		{
 			if(dt > MaxDeltaTime)
 				dt = MaxDeltaTime;
