@@ -105,7 +105,6 @@ public class Core : Game
 	private CoroutineManager _coroutineManager = new();
 	private TimerManager _timerManager = new();
 
-
 	/// <summary>
 	/// The currently active Scene. Note that if set, the Scene will not actually change until the end of the Update
 	/// </summary>

@@ -39,6 +39,7 @@ namespace Nez.Tiled
 
 		public Vector2[] Points;
 		public Dictionary<string, string> Properties;
+		public Vector2 ToVector2 => new Vector2(X, Y);
 	}
 
 	public class TmxText
