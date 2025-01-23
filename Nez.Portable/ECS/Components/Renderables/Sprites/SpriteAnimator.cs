@@ -109,6 +109,11 @@ namespace Nez.Sprites
 		/// </summary>
 		public float FrameTimeLeft { get; private set; }
 
+		/// <summary>
+		/// At which point of the animation the current frame is, from 0 (start) to 1 (end)
+		/// </summary>
+		public float NormalizedTime { get; private set; }
+
 		public PingPongLoopStates PingPongLoopState { get; set; }
 		
 		private bool _pingPongOnceAnimationStarted = false;
@@ -125,6 +130,7 @@ namespace Nez.Sprites
 
 			CurrentElapsedTime += Time.DeltaTime;
 			FrameTimeLeft -= Time.DeltaTime;
+			NormalizedTime = CurrentFrame / (float) FrameCount;
 			if (ShouldChangeFrame())
 			{
 				NextFrame();
