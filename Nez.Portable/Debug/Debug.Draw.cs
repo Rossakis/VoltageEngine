@@ -108,6 +108,18 @@ namespace Nez
 		}
 
 		[Conditional("DEBUG")]
+		public static void DrawHollowBox(Vector2 center, int sizeX, int sizeY, Color color, float duration = 0f)
+		{
+			if (!Core.DebugRenderEnabled)
+				return;
+
+			var halfXSize = sizeX * 0.5f;
+			var halfYSize = sizeY * 0.5f;
+			_debugDrawItems.Add(new DebugDrawItem(
+				new Rectangle((int)(center.X - sizeX), (int)(center.Y - sizeY), sizeX, sizeY), color, duration));
+		}
+
+		[Conditional("DEBUG")]
 		public static void DrawText(BitmapFont font, string text, Vector2 position, Color color, float duration = 0f,
 									float scale = 1f)
 		{
