@@ -1,11 +1,7 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using ImGuiNET;
-using Nez.ImGuiTools.ObjectInspectors;
 using Nez.ImGuiTools.SceneGraphPanes;
 using Num = System.Numerics;
-
 
 namespace Nez.ImGuiTools;
 
@@ -22,22 +18,22 @@ public class SceneGraphWindow
 	public event Action OnSaveAllChanges;
 	public event Action OnCancelChanges;
 
-	private void InvokeSaveEntityChanges()
+	public void InvokeSaveEntityChanges()
 	{
 		OnSaveEntityChanges?.Invoke();
 	}
 
-	private void InvokeSaveSceneChanges()
+	public void InvokeSaveSceneChanges()
 	{
 		OnSaveSceneChanges?.Invoke();
 	}
 
-	private void InvokeSaveAllChanges()
+	public void InvokeSaveAllChanges()
 	{
 		OnSaveAllChanges?.Invoke();
 	}
 
-	private void InvokeCancelChanges()
+	public void InvokeCancelChanges()
 	{
 		OnCancelChanges?.Invoke();
 	}

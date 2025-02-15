@@ -94,6 +94,7 @@ public class Core : Game
 	private Scene _scene;
 	private Scene _nextScene;
 	internal SceneTransition _sceneTransition;
+	public SceneTransition SceneTransition => _sceneTransition;
 
 	/// <summary>
 	/// used to coalesce GraphicsDeviceReset events
