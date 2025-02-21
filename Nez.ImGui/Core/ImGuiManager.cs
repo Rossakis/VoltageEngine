@@ -268,6 +268,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 			}
 
 		var entityInspector = new EntityInspector(entity);
+
 		entityInspector.SetWindowFocus();
 		_entityInspectors.Add(entityInspector);
 	}
