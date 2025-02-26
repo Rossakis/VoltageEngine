@@ -212,7 +212,7 @@ namespace Nez.Console
 
 
 		[Command("timescale", "Sets the timescale. Defaults to 1")]
-		static void Tilescale(float timeScale = 1)
+		static void Timescale(float timeScale = 1)
 		{
 			Time.TimeScale = timeScale;
 		}
