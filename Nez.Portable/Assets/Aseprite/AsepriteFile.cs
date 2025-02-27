@@ -108,12 +108,14 @@ public sealed class AsepriteFile
 	/// indicates the amount of padding, in transparent pixels, to add around the edges of each frame in the
 	/// generated texture.
 	/// </param>
+	/// <param name="spriteOrigin">
+	/// make the sprite origin something other than sourceRect.GetHalfSize()
+	/// </param>
 	/// <returns>
 	/// A new instance of hte <see cref="SpriteAtlas"/> class initialized with the data generated from this Aseprite
 	/// file.
 	/// </returns>
-	public SpriteAtlas ToSpriteAtlas(bool onlyVisibleLayers = true, int borderPadding = 0, int spacing = 0,
-		int innerPadding = 0)
+	public SpriteAtlas ToSpriteAtlas(bool onlyVisibleLayers = true, int borderPadding = 0, int spacing = 0, int innerPadding = 0, Vector2? spriteOrigin = null) 
 	{
 		var atlas = new SpriteAtlas
 		{
@@ -175,7 +177,10 @@ public sealed class AsepriteFile
 		var texture = new Texture2D(Core.GraphicsDevice, imageWidth, imageHeight);
 		texture.SetData<Color>(imagePixels);
 
-		for (var i = 0; i < Frames.Count; i++) atlas.Sprites[i] = new Sprite(texture, regions[i]);
+		for (var i = 0; i < Frames.Count; i++)
+		{
+			atlas.Sprites[i] = new Sprite(texture, regions[i], spriteOrigin ?? regions[i].GetHalfSize());
+		}
 
 		for (var tagNum = 0; tagNum < Tags.Count; tagNum++)
 		{
@@ -196,6 +201,21 @@ public sealed class AsepriteFile
 		}
 
 		return atlas;
+	}
+
+	/// <summary>
+	/// Translates the data in this aseprite file to a sprite atlas that can be used in a sprite animator component.
+	/// </summary>
+	/// <param name="spriteOrigin">
+	/// make the sprite origin something other than sourceRect.GetHalfSize()
+	/// </param>
+	/// <returns>
+	/// A new instance of hte <see cref="SpriteAtlas"/> class initialized with the data generated from this Aseprite
+	/// file.
+	/// </returns>
+	public SpriteAtlas ToSpriteAtlasWithOrigin(Vector2 spriteOrigin)
+	{
+		return ToSpriteAtlas(true, 0, 0, 0, spriteOrigin);
 	}
 
 	/// <summary>

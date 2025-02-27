@@ -70,9 +70,14 @@ namespace Nez
 		/// </summary>
 		protected Material _currentMaterial;
 
+		/// <summary>
+		/// the scene this Renderer is attached to
+		/// </summary>
+		public Scene Scene;
+
 
 		protected Renderer(int renderOrder) : this(renderOrder, null)
-		{}
+		{ }
 
 		protected Renderer(int renderOrder, Camera camera)
 		{
@@ -85,7 +90,7 @@ namespace Nez
 		/// </summary>
 		/// <param name="scene">Scene.</param>
 		public virtual void OnAddedToScene(Scene scene)
-		{}
+		{ }
 
 		/// <summary>
 		/// called when a scene is ended or this Renderer is removed from the Scene. use this for cleanup.
