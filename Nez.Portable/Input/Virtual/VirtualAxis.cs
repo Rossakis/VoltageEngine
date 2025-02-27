@@ -99,7 +99,7 @@ namespace Nez
 			/// <summary>
 			/// if true, pressing up will return -1 and down will return 1 matching GamePadDpadUpDown
 			/// </summary>
-			public bool InvertResult = true;
+			public bool InvertResult = false;
 
 			public int GamepadIndex;
 			public float Deadzone;
@@ -197,9 +197,9 @@ namespace Nez
 				get
 				{
 					if (Input.GamePads[GamepadIndex].DpadDownDown)
-						return 1f;
-					else if (Input.GamePads[GamepadIndex].DpadUpDown)
 						return -1f;
+					else if (Input.GamePads[GamepadIndex].DpadUpDown)
+						return 1f;
 					else
 						return 0f;
 				}

@@ -16,7 +16,6 @@ public class SceneGraphWindow
 	public event Action OnSaveEntityChanges;
 	public event Action OnSaveSceneChanges;
 	public event Action OnSaveAllChanges;
-	public event Action OnCancelChanges;
 	public event Action OnResetScene;
 	public event Action<bool> OnSwitchEditMode;
 
@@ -33,11 +32,6 @@ public class SceneGraphWindow
 	public void InvokeSaveAllChanges()
 	{
 		OnSaveAllChanges?.Invoke();
-	}
-
-	public void InvokeCancelChanges()
-	{
-		OnCancelChanges?.Invoke();
 	}
 
 	public void InvokeResetScene()
@@ -99,11 +93,8 @@ public class SceneGraphWindow
 				ImGui.OpenPopup("save-changes");
 
 			NezImGui.MediumVerticalSpace();
-			if (NezImGui.CenteredButton("Cancel Changes", 0.7f))
-				ImGui.OpenPopup("cancel-changes");
-
+			
 			DrawSaveChangesPopup();
-			DrawCancelChangesPopup();
 
 			ImGui.End();
 		}
@@ -138,23 +129,6 @@ public class SceneGraphWindow
 				InvokeSaveAllChanges();
 				ImGui.CloseCurrentPopup();
 			}
-		}
-	}
-
-	private void DrawCancelChangesPopup()
-	{
-		if (ImGui.BeginPopup("cancel-changes"))
-		{
-			ImGui.Text("Are you sure you want to CANCEL ALL changes?");
-
-			if (ImGui.Button("Yes"))
-			{
-				InvokeCancelChanges();
-				ImGui.CloseCurrentPopup();
-			}
-
-			if (ImGui.Button("No"))
-				ImGui.CloseCurrentPopup();
 		}
 	}
 }

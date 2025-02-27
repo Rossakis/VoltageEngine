@@ -85,7 +85,7 @@ public class EntityPane
 			}
 
 
-		if (_selectedEntityCollider != null)
+		if (_selectedEntityCollider != null && Core.IsEditMode)
 			Debug.DrawHollowRect(_selectedEntityCollider.Bounds, Debug.Colors.SelectedByInspectorEntity);
 
 		if (treeNodeOpened)
