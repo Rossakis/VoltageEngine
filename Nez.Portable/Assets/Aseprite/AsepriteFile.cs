@@ -115,7 +115,7 @@ public sealed class AsepriteFile
 	/// A new instance of hte <see cref="SpriteAtlas"/> class initialized with the data generated from this Aseprite
 	/// file.
 	/// </returns>
-	public SpriteAtlas ToSpriteAtlas(bool onlyVisibleLayers = true, int borderPadding = 0, int spacing = 0, int innerPadding = 0, Vector2? spriteOrigin = null) 
+	public SpriteAtlas ToSpriteAtlas(string layerName = null, bool onlyVisibleLayers = true, int borderPadding = 0, int spacing = 0, int innerPadding = 0, Vector2? spriteOrigin = null) 
 	{
 		var atlas = new SpriteAtlas
 		{
@@ -127,7 +127,7 @@ public sealed class AsepriteFile
 
 		var flattenedFrames = new Color[Frames.Count][];
 
-		for (var i = 0; i < Frames.Count; i++) flattenedFrames[i] = Frames[i].FlattenFrame(onlyVisibleLayers);
+		for (var i = 0; i < Frames.Count; i++) flattenedFrames[i] = Frames[i].FlattenFrame(onlyVisibleLayers, false, layerName);
 
 		var sqrt = Math.Sqrt(Frames.Count);
 		var columns = (int)Math.Ceiling(sqrt);
@@ -213,9 +213,9 @@ public sealed class AsepriteFile
 	/// A new instance of hte <see cref="SpriteAtlas"/> class initialized with the data generated from this Aseprite
 	/// file.
 	/// </returns>
-	public SpriteAtlas ToSpriteAtlasWithOrigin(Vector2 spriteOrigin)
+	public SpriteAtlas ToSpriteAtlasWithOrigin(Vector2 spriteOrigin, string layerName)
 	{
-		return ToSpriteAtlas(true, 0, 0, 0, spriteOrigin);
+		return ToSpriteAtlas(layerName, true, 0, 0, 0, spriteOrigin);
 	}
 
 	/// <summary>
