@@ -203,7 +203,7 @@ public sealed class AsepriteFile
 		return atlas;
 	}
 
-	public SpriteAtlas ToSpriteAtlasFromLayers(string[] layers = null, bool onlyVisibleLayers = true, int borderPadding = 0, int spacing = 0, int innerPadding = 0, Vector2? spriteOrigin = null)
+	public SpriteAtlas ToSpriteAtlasFromLayers(bool onlyVisibleLayers = true, int borderPadding = 0, int spacing = 0, int innerPadding = 0, Vector2? spriteOrigin = null, params string[] layers)
 	{
 		var atlas = new SpriteAtlas
 		{
