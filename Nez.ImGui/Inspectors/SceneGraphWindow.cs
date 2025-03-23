@@ -7,9 +7,15 @@ namespace Nez.ImGuiTools;
 
 public class SceneGraphWindow
 {
+	/// <summary>
+	/// A copy of a component that can be pasted to another entity
+	/// </summary>
+	public Component CopiedComponent { get; set; } 
+
 	private PostProcessorsPane _postProcessorsPane = new();
 	private RenderersPane _renderersPane = new();
 	private EntityPane _entityPane = new();
+	private ImGuiManager _imGuiManager;
 
 	#region Event Handlers
 
@@ -57,6 +63,9 @@ public class SceneGraphWindow
 		if (Core.Scene == null || !isOpen)
 			return;
 
+		if(_imGuiManager == null)
+			_imGuiManager = Core.GetGlobalManager<ImGuiManager>();
+
 		ImGui.SetNextWindowPos(new Num.Vector2(0, 25), ImGuiCond.FirstUseEver);
 		ImGui.SetNextWindowSize(new Num.Vector2(300, Screen.Height / 2), ImGuiCond.FirstUseEver);
 
@@ -92,8 +101,19 @@ public class SceneGraphWindow
 			if (NezImGui.CenteredButton("Save Changes", 0.7f))
 				ImGui.OpenPopup("save-changes");
 
+			// Show Copied Component
 			NezImGui.MediumVerticalSpace();
+			if (_imGuiManager.SceneGraphWindow.CopiedComponent != null)
+			{
+				NezImGui.VeryBigVerticalSpace();
+				ImGui.TextWrapped($"Component Copied: {_imGuiManager.SceneGraphWindow.CopiedComponent.GetType().Name}");
+
+				NezImGui.SmallVerticalSpace();
+				if (NezImGui.CenteredButton("Clear Copied Component", 0.8f))
+					_imGuiManager.SceneGraphWindow.CopiedComponent = null;
+			}
 			
+
 			DrawSaveChangesPopup();
 
 			ImGui.End();

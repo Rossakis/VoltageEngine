@@ -8,6 +8,7 @@ namespace Nez.ImGuiTools.ObjectInspectors
 {
 	public class ComponentInspector : AbstractComponentInspector
 	{
+		private ImGuiManager _imGuiManager;
 		public override Entity Entity => _component.Entity;
 		public override Component Component => _component;
 
@@ -41,12 +42,34 @@ namespace Nez.ImGuiTools.ObjectInspectors
 
 		public override void Draw()
 		{
+			if(_imGuiManager == null)
+				_imGuiManager = Core.GetGlobalManager<ImGuiManager>();
+
 			ImGui.PushID(_scopeId);
 			var isHeaderOpen = ImGui.CollapsingHeader(_name);
 
 			// context menu has to be outside the isHeaderOpen block so it works open or closed
 			if (ImGui.BeginPopupContextItem())
 			{
+				//Copy
+				if (ImGui.Selectable("Copy Component")) 
+				{
+					_imGuiManager.SceneGraphWindow.CopiedComponent = _component;
+				}
+
+				NezImGui.SmallVerticalSpace();
+
+				//Paste
+				if(_imGuiManager.SceneGraphWindow.CopiedComponent != null && ImGui.Selectable("Paste Component"))
+				{
+					var temp = _component;
+					_component.Entity.RemoveComponent(_component);
+					temp.Entity.AddComponent(_imGuiManager.SceneGraphWindow.CopiedComponent);
+				}
+
+				ImGui.Separator();
+				NezImGui.SmallVerticalSpace();
+
 				if (ImGui.Selectable("Remove Component"))
 				{
 					_component.RemoveComponent();

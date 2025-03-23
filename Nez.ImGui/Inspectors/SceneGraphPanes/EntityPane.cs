@@ -7,6 +7,8 @@ namespace Nez.ImGuiTools.SceneGraphPanes;
 
 public class EntityPane
 {
+	public static Collider _selectedEntityCollider; //Used for rendering a collider box for the currently selected entity
+
 	/// <summary>
 	/// if this number of entites is exceeded we switch to a list clipper to keep things fast
 	/// </summary>
@@ -16,8 +18,7 @@ public class EntityPane
 
 	private Entity _previousEntity; //Used for rendering a collider box for the currently selected entity
 
-	public static Collider
-		_selectedEntityCollider; //Used for rendering a collider box for the currently selected entity
+	private ImGuiManager _imGuiManager;
 
 	public unsafe void Draw()
 	{
@@ -40,6 +41,7 @@ public class EntityPane
 				DrawEntity(Core.Scene.Entities[i]);
 		}
 
+		
 		NezImGui.MediumVerticalSpace();
 		if (NezImGui.CenteredButton("Create Entity", 0.6f)) ImGui.OpenPopup("create-entity");
 		DrawCreateEntityPopup();
@@ -101,8 +103,35 @@ public class EntityPane
 
 	private void DrawEntityContextMenuPopup(Entity entity)
 	{
+		if (_imGuiManager == null)
+			_imGuiManager = Core.GetGlobalManager<ImGuiManager>();
+
 		if (ImGui.BeginPopup("entityContextMenu"))
 		{
+			if (_imGuiManager.SceneGraphWindow.CopiedComponent != null && ImGui.Selectable("Paste Component"))
+			{
+				//Component Commands
+				NezImGui.SmallVerticalSpace();
+
+				int index = -1;
+				for (var i = 0; i < entity.Components.Count; i++)
+				{
+					if (entity.Components[i].GetType() == _imGuiManager.SceneGraphWindow.CopiedComponent.GetType())
+					{
+						index = i;
+						break;
+					}
+				}
+
+				if(index > -1)
+				{
+					var temp = _imGuiManager.SceneGraphWindow.CopiedComponent;
+					entity.RemoveComponent(entity.Components[index]);
+					entity.AddComponent(temp);
+				}
+			}
+
+			//Entity Commands
 			if (ImGui.Selectable("Move Camera to " + entity.Name))
 				if (Core.Scene.Entities.Count > 0 && Core.IsEditMode)
 					Core.Scene.Camera.Position = entity.Transform.Position;

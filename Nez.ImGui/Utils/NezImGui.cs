@@ -19,6 +19,8 @@ namespace Nez.ImGuiTools
 		public static void SmallVerticalSpace() => ImGui.Dummy(new Num.Vector2(0, 5));
 
 		public static void MediumVerticalSpace() => ImGui.Dummy(new Num.Vector2(0, 10));
+		public static void BigVerticalSpace() => ImGui.Dummy(new Num.Vector2(0, 15));
+		public static void VeryBigVerticalSpace() => ImGui.Dummy(new Num.Vector2(0, 20));
 
 		/// <summary>
 		/// adds a DrawList command to draw a border around the group

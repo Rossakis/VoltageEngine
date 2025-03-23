@@ -278,6 +278,9 @@ namespace Nez.Spatial
 			var currentCell = CellCoords(start.X, start.Y);
 			var lastCell = CellCoords(end.X, end.Y);
 
+			if (Double.IsNaN(ray.Direction.X) || Double.IsNaN(ray.Direction.Y))
+				throw new Exception("ray Direction values are NaN!");
+
 			// what direction are we incrementing the cell checks?
 			var stepX = Math.Sign(ray.Direction.X);
 			var stepY = Math.Sign(ray.Direction.Y);
