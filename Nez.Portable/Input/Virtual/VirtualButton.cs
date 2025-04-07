@@ -302,6 +302,21 @@ namespace Nez
 			return this;
 		}
 
+		/// <summary>
+		/// Removes all nodes of the specified type from this VirtualButton.
+		/// </summary>
+		/// <param name="gamepadIndex"></param>
+		/// <param name="button"></param>
+		/// <returns></returns>
+		public VirtualButton RemoveGamePadButton(int gamepadIndex, Buttons button)
+		{
+			Nodes.RemoveAll(node =>
+				node is GamePadButton gamePadButton &&
+				gamePadButton.GamepadIndex == gamepadIndex &&
+				gamePadButton.Button == button
+			);
+			return this;
+		}
 		#endregion
 
 

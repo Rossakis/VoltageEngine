@@ -54,10 +54,14 @@ public class Component : IComparable<Component>
 		set => SetUpdateOrder(value);
 	}
 
+	/// <summary>
+	/// Show the desited name of the component in the ImGui inspector. If null, the type name will be used.
+	/// </summary>
+	public string Name { get; set; }
+
 	private bool _enabled = true;
 
 	internal int _updateOrder = 0;
-
 
 	#region Component Lifecycle
 
