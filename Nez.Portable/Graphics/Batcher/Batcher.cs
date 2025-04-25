@@ -48,6 +48,16 @@ namespace Nez
 		SamplerState _samplerState;
 		DepthStencilState _depthStencilState;
 		RasterizerState _rasterizerState;
+
+		RasterizerState _scissorTestRasterizerState = new RasterizerState
+		{
+			CullMode = CullMode.CullCounterClockwiseFace,
+			FillMode = FillMode.Solid,
+			DepthBias = 0,
+			MultiSampleAntiAlias = true,
+			ScissorTestEnable = true,
+			SlopeScaleDepthBias = 0,
+		};
 		bool _disableBatching;
 
 		// How many sprites are in the current batch?
@@ -78,15 +88,15 @@ namespace Nez
 		const int MAX_INDICES = MAX_SPRITES * 6;
 
 		// Used to calculate texture coordinates
-		static readonly float[] _cornerOffsetX = new float[] {0.0f, 1.0f, 0.0f, 1.0f};
-		static readonly float[] _cornerOffsetY = new float[] {0.0f, 0.0f, 1.0f, 1.0f};
+		static readonly float[] _cornerOffsetX = new float[] { 0.0f, 1.0f, 0.0f, 1.0f };
+		static readonly float[] _cornerOffsetY = new float[] { 0.0f, 0.0f, 1.0f, 1.0f };
 		static readonly short[] _indexData = GenerateIndexArray();
 
 		#endregion
-		
-		#if FNA
+
+#if FNA
 		static Batcher() => UseFnaHalfPixelMatrix = true;
-		#endif
+#endif
 
 		public Batcher(GraphicsDevice graphicsDevice)
 		{
@@ -185,7 +195,7 @@ namespace Nez
 		}
 
 		public void Begin(BlendState blendState, SamplerState samplerState, DepthStencilState depthStencilState,
-		                  RasterizerState rasterizerState)
+						  RasterizerState rasterizerState)
 		{
 			Begin(
 				blendState,
@@ -199,7 +209,7 @@ namespace Nez
 		}
 
 		public void Begin(BlendState blendState, SamplerState samplerState, DepthStencilState depthStencilState,
-		                  RasterizerState rasterizerState, Effect effect)
+						  RasterizerState rasterizerState, Effect effect)
 		{
 			Begin(
 				blendState,
@@ -213,8 +223,8 @@ namespace Nez
 		}
 
 		public void Begin(BlendState blendState, SamplerState samplerState, DepthStencilState depthStencilState,
-		                  RasterizerState rasterizerState,
-		                  Effect effect, Matrix transformationMatrix)
+						  RasterizerState rasterizerState,
+						  Effect effect, Matrix transformationMatrix)
 		{
 			Begin(
 				blendState,
@@ -228,8 +238,8 @@ namespace Nez
 		}
 
 		public void Begin(BlendState blendState, SamplerState samplerState, DepthStencilState depthStencilState,
-		                  RasterizerState rasterizerState,
-		                  Effect effect, Matrix transformationMatrix, bool disableBatching)
+						  RasterizerState rasterizerState,
+						  Effect effect, Matrix transformationMatrix, bool disableBatching)
 		{
 			Insist.IsFalse(_beginCalled,
 				"Begin has been called before calling End after the last call to Begin. Begin cannot be called again until End has been successfully called.");
@@ -304,12 +314,12 @@ namespace Nez
 		}
 
 		public void Draw(Texture2D texture, Rectangle destinationRectangle, Rectangle? sourceRectangle, Color color,
-		                 SpriteEffects effects)
+						 SpriteEffects effects)
 		{
 			CheckBegin();
 			PushSprite(texture, sourceRectangle, destinationRectangle.X, destinationRectangle.Y,
 				destinationRectangle.Width, destinationRectangle.Height,
-				color, Vector2.Zero, 0.0f, 0.0f, (byte) (effects & (SpriteEffects) 0x03), true, 0, 0, 0, 0);
+				color, Vector2.Zero, 0.0f, 0.0f, (byte)(effects & (SpriteEffects)0x03), true, 0, 0, 0, 0);
 		}
 
 		public void Draw(
@@ -335,7 +345,7 @@ namespace Nez
 				Vector2.Zero,
 				rotation,
 				layerDepth,
-				(byte) (effects & (SpriteEffects) 0x03),
+				(byte)(effects & (SpriteEffects)0x03),
 				true,
 				skewTopX, skewBottomX, skewLeftY, skewRightY
 			);
@@ -385,7 +395,7 @@ namespace Nez
 				origin,
 				rotation,
 				layerDepth,
-				(byte) (effects & (SpriteEffects) 0x03),
+				(byte)(effects & (SpriteEffects)0x03),
 				false,
 				0, 0, 0, 0
 			);
@@ -413,7 +423,7 @@ namespace Nez
 				origin,
 				rotation,
 				layerDepth,
-				(byte) (effects & (SpriteEffects) 0x03),
+				(byte)(effects & (SpriteEffects)0x03),
 				0, 0, 0, 0
 			);
 		}
@@ -442,7 +452,7 @@ namespace Nez
 				origin,
 				rotation,
 				layerDepth,
-				(byte) (effects & (SpriteEffects) 0x03),
+				(byte)(effects & (SpriteEffects)0x03),
 				false,
 				0, 0, 0, 0
 			);
@@ -470,7 +480,7 @@ namespace Nez
 				origin,
 				rotation,
 				layerDepth,
-				(byte) (effects & (SpriteEffects) 0x03),
+				(byte)(effects & (SpriteEffects)0x03),
 				0, 0, 0, 0
 			);
 		}
@@ -500,7 +510,7 @@ namespace Nez
 				origin,
 				rotation,
 				layerDepth,
-				(byte) (effects & (SpriteEffects) 0x03),
+				(byte)(effects & (SpriteEffects)0x03),
 				false,
 				skewTopX, skewBottomX, skewLeftY, skewRightY
 			);
@@ -529,7 +539,7 @@ namespace Nez
 				origin,
 				rotation,
 				layerDepth,
-				(byte) (effects & (SpriteEffects) 0x03),
+				(byte)(effects & (SpriteEffects)0x03),
 				true,
 				0, 0, 0, 0
 			);
@@ -636,7 +646,7 @@ namespace Nez
 
 		[Obsolete("SpriteFont is too locked down to use directly. Wrap it in a NezSpriteFont")]
 		public void DrawString(SpriteFont spriteFont, string text, Vector2 position, Color color, float rotation,
-		                       Vector2 origin, Vector2 scale, SpriteEffects effects, float layerDepth)
+							   Vector2 origin, Vector2 scale, SpriteEffects effects, float layerDepth)
 		{
 			throw new NotImplementedException("SpriteFont is too locked down to use directly. Wrap it in a NezSpriteFont");
 		}
@@ -646,12 +656,12 @@ namespace Nez
 			var result = new short[MAX_INDICES];
 			for (int i = 0, j = 0; i < MAX_INDICES; i += 6, j += 4)
 			{
-				result[i] = (short) (j);
-				result[i + 1] = (short) (j + 1);
-				result[i + 2] = (short) (j + 2);
-				result[i + 3] = (short) (j + 3);
-				result[i + 4] = (short) (j + 2);
-				result[i + 5] = (short) (j + 1);
+				result[i] = (short)(j);
+				result[i + 1] = (short)(j + 1);
+				result[i + 2] = (short)(j + 2);
+				result[i + 3] = (short)(j + 3);
+				result[i + 4] = (short)(j + 2);
+				result[i + 5] = (short)(j + 1);
 			}
 
 			return result;
@@ -665,9 +675,9 @@ namespace Nez
 		/// </summary>
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		unsafe void PushSprite(Texture2D texture, Rectangle? sourceRectangle, float destinationX, float destinationY,
-		                float destinationW, float destinationH, Color color, Vector2 origin,
-		                float rotation, float depth, byte effects, bool destSizeInPixels, float skewTopX,
-		                float skewBottomX, float skewLeftY, float skewRightY)
+						float destinationW, float destinationH, Color color, Vector2 origin,
+						float rotation, float depth, byte effects, bool destSizeInPixels, float skewTopX,
+						float skewBottomX, float skewLeftY, float skewRightY)
 		{
 			// out of space, flush
 			if (_numSprites >= MAX_SPRITES)
@@ -684,8 +694,8 @@ namespace Nez
 			float originX, originY;
 			if (sourceRectangle.HasValue)
 			{
-				var inverseTexW = 1.0f / (float) texture.Width;
-				var inverseTexH = 1.0f / (float) texture.Height;
+				var inverseTexW = 1.0f / (float)texture.Width;
+				var inverseTexH = 1.0f / (float)texture.Height;
 
 				sourceX = sourceRectangle.Value.X * inverseTexW;
 				sourceY = sourceRectangle.Value.Y * inverseTexH;
@@ -844,9 +854,9 @@ namespace Nez
 		/// </summary>
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		unsafe void PushSprite(Sprite sprite, float destinationX, float destinationY, float destinationW,
-		                float destinationH, Color color, Vector2 origin,
-		                float rotation, float depth, byte effects, float skewTopX, float skewBottomX, float skewLeftY,
-		                float skewRightY)
+						float destinationH, Color color, Vector2 origin,
+						float rotation, float depth, byte effects, float skewTopX, float skewBottomX, float skewLeftY,
+						float skewRightY)
 		{
 			// out of space, flush
 			if (_numSprites >= MAX_SPRITES)
@@ -1003,14 +1013,14 @@ namespace Nez
 
 			PrepRenderState();
 
-			#if FNA
+#if FNA
 			fixed (VertexPositionColorTexture4* p = &_vertexInfo[0])
 			{
 				_vertexBuffer.SetDataPointerEXT(0, (IntPtr)p, _numSprites * VertexPositionColorTexture4.RealStride, SetDataOptions.Discard);
 			}
-			#else
+#else
 			_vertexBuffer.SetData(0, _vertexInfo, 0, _numSprites, VertexPositionColorTexture4.RealStride, SetDataOptions.Discard);
-			#endif
+#endif
 
 			curTexture = _textureInfo[0];
 			for (var i = 1; i < _numSprites; i += 1)
@@ -1041,15 +1051,8 @@ namespace Nez
 
 			FlushBatch();
 
-			_rasterizerState = new RasterizerState
-			{
-				CullMode = _rasterizerState.CullMode,
-				DepthBias = _rasterizerState.DepthBias,
-				FillMode = _rasterizerState.FillMode,
-				MultiSampleAntiAlias = _rasterizerState.MultiSampleAntiAlias,
-				SlopeScaleDepthBias = _rasterizerState.SlopeScaleDepthBias,
-				ScissorTestEnable = shouldEnable
-			};
+			// reset to whatever Begin was called with
+			_rasterizerState = shouldEnable ? _scissorTestRasterizerState : _rasterizerState;
 		}
 
 		void PrepRenderState()

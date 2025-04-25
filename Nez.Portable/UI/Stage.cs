@@ -1,8 +1,8 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
-using System.Collections.Generic;
-using Nez.Utils;
 using Nez.Utils.Extensions;
+using Nez.Utils;
+using System.Collections.Generic;
 using Nez.Utils.Timers;
 
 
@@ -33,6 +33,26 @@ namespace Nez.UI
 		/// the key that activates the focused control
 		/// </summary>
 		public Keys KeyboardActionKey = Keys.Enter;
+		/// <summary>
+		/// the key(s) that activates the focused control
+		/// </summary>
+		public Keys[] KeyboardActionKeys = [];
+		/// <summary>
+		/// the key(s) that triggers "direction down" on the element with focus
+		/// </summary>
+		public Keys[] KeyboardDownKeys = [Keys.Down];
+		/// <summary>
+		/// the key(s) that triggers "direction up" on the element with focus
+		/// </summary>
+		public Keys[] KeyboardUpKeys = [Keys.Up];
+		/// <summary>
+		/// the key(s) that triggers "direction left" on the element with focus
+		/// </summary>
+		public Keys[] KeyboardLeftKeys = [Keys.Left];
+		/// <summary>
+		/// the key(s) that triggers "direction right" on the element with focus
+		/// </summary>
+		public Keys[] KeyboardRightKeys = [Keys.Right];
 
 		Group root;
 		public Camera Camera;
@@ -441,26 +461,26 @@ namespace Nez.UI
 			if (_gamepadFocusElement != null)
 			{
 				if (Input.GamePads[0].IsButtonPressed(GamepadActionButton) ||
-					(KeyboardEmulatesGamepad && Input.IsKeyPressed(KeyboardActionKey)))
+					(KeyboardEmulatesGamepad && IsKeyboardActionKeyPressed()))
 					_gamepadFocusElement.OnActionButtonPressed();
 				else if (Input.GamePads[0].IsButtonReleased(GamepadActionButton) ||
-						 (KeyboardEmulatesGamepad && Input.IsKeyReleased(KeyboardActionKey)))
+						 (KeyboardEmulatesGamepad && IsKeyboardActionKeyReleased()))
 					_gamepadFocusElement.OnActionButtonReleased();
 			}
 
 			IGamepadFocusable nextElement = null;
 			var direction = Direction.None;
 			if (Input.GamePads[0].DpadLeftPressed || Input.GamePads[0].IsLeftStickLeftPressed() ||
-				(KeyboardEmulatesGamepad && Input.IsKeyPressed(Keys.Left)))
+				(KeyboardEmulatesGamepad && Input.IsKeyPressed(KeyboardLeftKeys)))
 				direction = Direction.Left;
 			else if (Input.GamePads[0].DpadRightPressed || Input.GamePads[0].IsLeftStickRightPressed() ||
-					 (KeyboardEmulatesGamepad && Input.IsKeyPressed(Keys.Right)))
+					 (KeyboardEmulatesGamepad && Input.IsKeyPressed(KeyboardRightKeys)))
 				direction = Direction.Right;
 			else if (Input.GamePads[0].DpadUpPressed || Input.GamePads[0].IsLeftStickUpPressed() ||
-					 (KeyboardEmulatesGamepad && Input.IsKeyPressed(Keys.Up)))
+					 (KeyboardEmulatesGamepad && Input.IsKeyPressed(KeyboardUpKeys)))
 				direction = Direction.Up;
 			else if (Input.GamePads[0].DpadDownPressed || Input.GamePads[0].IsLeftStickDownPressed() ||
-					 (KeyboardEmulatesGamepad && Input.IsKeyPressed(Keys.Down)))
+					 (KeyboardEmulatesGamepad && Input.IsKeyPressed(KeyboardDownKeys)))
 				direction = Direction.Down;
 
 			// make sure we have a valid direction
@@ -488,6 +508,32 @@ namespace Nez.UI
 		public void RemoveInputFocusListener(Element element)
 		{
 			_inputFocusListeners.Remove(element);
+		}
+
+
+		/// <summary>
+		/// Compares Keys[] first, then compares Keys 
+		/// </summary>
+		/// <returns><c>true</c>, if keys[] is not empty and any of the keys are pressed, otherwise if the KeyboardActionKey is pressed, <c>false</c> otherwise.</returns>
+		bool IsKeyboardActionKeyPressed()
+		{
+			if (KeyboardActionKeys.Length == 0)
+				return Input.IsKeyPressed(KeyboardActionKey);
+			else
+				return Input.IsKeyPressed(KeyboardActionKeys);
+		}
+
+
+		/// <summary>
+		/// Compares Keys[] first, then compares Keys 
+		/// </summary>
+		/// <returns><c>true</c>, if keys[] is not empty and any of the keys are released, otherwise if the KeyboardActionKey is released, <c>false</c> otherwise.</returns>
+		bool IsKeyboardActionKeyReleased()
+		{
+			if (KeyboardActionKeys.Length == 0)
+				return Input.IsKeyReleased(KeyboardActionKey);
+			else
+				return Input.IsKeyReleased(KeyboardActionKeys);
 		}
 
 		#endregion
@@ -699,14 +745,14 @@ namespace Nez.UI
 				_gamepadFocusElement.OnUnfocused();
 			_gamepadFocusElement = focusable;
 		}
-		
+
 		/// <summary>
 		/// unset the gamepad focus element and turns off gamepad focus for this Stage.
 		/// </summary>
 		public void DisableGamepadFocus()
 		{
-    		_gamepadFocusElement = null;
-    		_isGamepadFocusEnabled = false;  
+			_gamepadFocusElement = null;
+			_isGamepadFocusEnabled = false;
 		}
 
 		/// <summary>

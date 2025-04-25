@@ -266,6 +266,7 @@ namespace Nez.Spatial
 		/// https://github.com/francisengelmann/fast_voxel_traversal/blob/master/main.cpp
 		/// http://www.cse.yorku.ca/~amana/research/grid.pdf
 		/// </summary>
+		/// <remarks>Returns -1 if ray contains NaN values!</remarks>
 		/// <returns>the number of Colliders returned</returns>
 		/// <param name="start">Start.</param>
 		/// <param name="end">End.</param>
@@ -284,18 +285,18 @@ namespace Nez.Spatial
 			if (MathUtils.IsVectorNaN(ray.Direction))
 		
 			{
-				Debug.Error("Invalid ray direction - using fallback");
-				ray = new Ray2D(start, start + Vector2.UnitX);
+				Debug.Error("\n Invalid ray direction - using fallback \n");
+				ray = new Ray2D(Vector2.Zero, Vector2.UnitX);
 			}
+
+			if (MathUtils.IsVectorNaN(ray.Direction))
+				throw new Exception("ray Direction values are NaN!");
 
 			_raycastParser.Start(ref ray, hits, layerMask);
 
 			// get our start/end position in the same space as our grid
 			var currentCell = CellCoords(start.X, start.Y);
 			var lastCell = CellCoords(end.X, end.Y);
-
-			if (float.IsNaN(ray.Direction.X) || float.IsNaN(ray.Direction.Y))
-				throw new Exception("'start' ray Direction values are NaN!");
 
 			// what direction are we incrementing the cell checks?
 			var stepX = Math.Sign(ray.Direction.X);

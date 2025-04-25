@@ -1,6 +1,8 @@
-﻿using Microsoft.Xna.Framework;
+﻿using System;
+using Microsoft.Xna.Framework;
 using System.Collections.Generic;
 using Nez.Spatial;
+using Nez.Utils;
 
 
 namespace Nez
@@ -127,6 +129,11 @@ namespace Nez
 		/// <param name="layerMask">Layer mask.</param>
 		public static RaycastHit Linecast(Vector2 start, Vector2 end, int layerMask = AllLayers)
 		{
+			if (MathUtils.IsVectorNaN(start))
+				throw new ArgumentException("start cannot be NaN", nameof(start));
+			if (MathUtils.IsVectorNaN(end))
+				throw new ArgumentException("end cannot be NaN", nameof(end));
+
 			// cleanse the collider before proceeding
 			_hitArray[0].Reset();
 			LinecastAll(start, end, _hitArray, layerMask);
