@@ -147,22 +147,19 @@ public class SpriteAnimator : SpriteRenderer, IUpdatable
 			case LoopMode.ClampForever:
 				var newFrame = CurrentFrame + 1;
 				if (newFrame >= FrameCount)
+				{
 					SetCompleted(CurrentLoopMode == LoopMode.Once);
+				}
 				else
+				{
 					SetFrame(newFrame);
+				}
 				break;
 
 			case LoopMode.PingPong:
-				if (FrameCount == 1) break;
-
-				switch (PingPongLoopState)
+				if (FrameCount == 1)
 				{
-					case PingPongLoopStates.Ping:
-						ParsePingLoop();
-						break;
-					case PingPongLoopStates.Pong:
-						ParsePongLoop();
-						break;
+					break;
 				}
 
 				ParsePingPongLoop();
@@ -231,16 +228,16 @@ public class SpriteAnimator : SpriteRenderer, IUpdatable
 	public bool IsRunning => AnimationState == State.Running;
 
 	/// <summary>
-	/// plays the animation with the given name. If no loopMode is specified it is defaults to Loop
+	/// plays the animation with the given name and frame. If no loopMode is specified it is defaults to Loop
 	/// </summary>
-	public void Play(string name, LoopMode loopMode = LoopMode.Loop)
+	public void Play(string name, LoopMode loopMode = LoopMode.Loop, int frameIndex = 0)
 	{
 		CurrentElapsedTime = 0;
 		CurrentAnimation = Animations[name];
 		CurrentAnimationName = name;
 		FrameCount = CurrentAnimation.FrameRates.Length;
 
-		SetFrame(0);
+		SetFrame(frameIndex);
 
 		CurrentLoopMode = loopMode;
 		AnimationState = State.Running;
