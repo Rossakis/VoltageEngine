@@ -84,6 +84,10 @@ namespace Nez.Persistence
 			constructor = type.GetConstructor(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance,
 				null, Type.EmptyTypes, null);
 			_constructorCache[type] = constructor;
+
+			if (constructor == null)
+				throw new InvalidOperationException($"No parameterless constructor found for type {type.FullName}");
+
 			return constructor.Invoke(null);
 		}
 
