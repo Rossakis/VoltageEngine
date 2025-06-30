@@ -95,7 +95,6 @@ public class Entity : IComparable<Entity>
 	private bool _enabled = true;
 	private bool _debugRenderEnabled = true;
 	internal int _updateOrder = 0;
-
 	#endregion
 
 
@@ -217,6 +216,19 @@ public class Entity : IComparable<Entity>
 	{
 		// notify our children of our changed position
 		Components.OnEntityTransformChanged(comp);
+	}
+
+	/// <summary>
+	/// This method is called by the Scene when the Entity is added to the Scene. It is used to initialize any parameters that are needed for the Entity to function properly.
+	/// (e.g. setting up physics colliders, initializing components, etc.), before the Entity is used in the Scene.
+	/// </summary>
+	public virtual void InitParams(params object[] args)
+	{
+	}
+
+	public virtual void FinishInit()
+	{
+
 	}
 
 
@@ -345,7 +357,6 @@ public class Entity : IComparable<Entity>
 		entity.Name = Name + "(clone)";
 		entity.CopyFrom(this);
 		entity.Transform.Position = position;
-
 		return entity;
 	}
 
@@ -381,12 +392,8 @@ public class Entity : IComparable<Entity>
 		}
 	}
 
-
 	#region Entity lifecycle methods
 
-	/// <summary>
-	/// Called when this entity is added to a scene after all pending entity changes are committed
-	/// </summary>
 	public virtual void OnAddedToScene()
 	{
 	}

@@ -43,8 +43,6 @@ public class EntityPane
 
 		
 		NezImGui.MediumVerticalSpace();
-		if (NezImGui.CenteredButton("Create Entity", 0.6f)) ImGui.OpenPopup("create-entity");
-		DrawCreateEntityPopup();
 	}
 
 	private void DrawEntity(Entity entity, bool onlyDrawRoots = true)
@@ -136,10 +134,27 @@ public class EntityPane
 				if (Core.Scene.Entities.Count > 0 && Core.IsEditMode)
 					Core.Scene.Camera.Position = entity.Transform.Position;
 
-			if (ImGui.Selectable("Clone Entity " + entity.Name))
+			// Check for parameterless constructor (and no non-parameterless children)
+			var hasParameterlessCtor = entity.GetType().GetConstructor(Type.EmptyTypes) != null;
+			if (hasParameterlessCtor && !InspectorCache.HasNonParameterlessChildEntity(entity))
 			{
-				var clone = entity.Clone(Core.Scene.Camera.Position);
-				entity.Scene.AddEntity(clone);
+				if (ImGui.Selectable("Clone Entity " + entity.Name))
+				{
+					var clone = entity.Clone(Core.Scene.Camera.Position);
+					entity.Scene.AddEntity(clone);
+				}
+			}
+			else if (hasParameterlessCtor && InspectorCache.HasNonParameterlessChildEntity(entity))
+			{
+				ImGui.BeginDisabled(true);
+				ImGui.Selectable("Can't clone Entity with Non-parameterless children!");
+				ImGui.EndDisabled();
+			}
+			else
+			{
+				ImGui.BeginDisabled(true);
+				ImGui.Selectable("Can't clone a Non-parameterless Entity!");
+				ImGui.EndDisabled();
 			}
 
 			if (ImGui.Selectable("Destroy Entity"))
@@ -148,68 +163,7 @@ public class EntityPane
 			if (ImGui.Selectable("Create Child Entity", false, ImGuiSelectableFlags.DontClosePopups))
 				ImGui.OpenPopup("create-new-entity");
 
-			if (ImGui.BeginPopup("create-new-entity"))
-			{
-				ImGui.Text("New Entity Name:");
-				ImGui.InputText("##newChildEntityName", ref _newEntityName, 25);
-
-				if (ImGui.Button("Cancel"))
-				{
-					_newEntityName = "";
-					ImGui.CloseCurrentPopup();
-				}
-
-				ImGui.SameLine(ImGui.GetContentRegionAvail().X - ImGui.GetItemRectSize().X);
-
-				ImGui.PushStyleColor(ImGuiCol.Button, Color.Green.PackedValue);
-				if (ImGui.Button("Create"))
-				{
-					_newEntityName = _newEntityName.Length > 0 ? _newEntityName : Utils.Utils.RandomString(8);
-					var newEntity = new Entity(_newEntityName);
-					newEntity.Transform.SetParent(entity.Transform);
-					entity.Scene.AddEntity(newEntity);
-
-					_newEntityName = "";
-					ImGui.CloseCurrentPopup();
-				}
-
-				ImGui.PopStyleColor();
-
-				ImGui.EndPopup();
-			}
-
 			ImGui.EndPopup();
-		}
-	}
-
-	private void DrawCreateEntityPopup()
-	{
-		if (ImGui.BeginPopup("create-entity"))
-		{
-			ImGui.Text("New Entity Name:");
-			ImGui.InputText("##newEntityName", ref _newEntityName, 25);
-
-			if (ImGui.Button("Cancel"))
-			{
-				_newEntityName = "";
-				ImGui.CloseCurrentPopup();
-			}
-
-			ImGui.SameLine(ImGui.GetContentRegionAvail().X - ImGui.GetItemRectSize().X);
-
-			ImGui.PushStyleColor(ImGuiCol.Button, Color.Green.PackedValue);
-			if (ImGui.Button("Create"))
-			{
-				_newEntityName = _newEntityName.Length > 0 ? _newEntityName : Utils.Utils.RandomString(8);
-				var newEntity = new Entity(_newEntityName);
-				newEntity.Transform.Position = Core.Scene.Camera.Transform.Position;
-				Core.Scene.AddEntity(newEntity);
-
-				_newEntityName = "";
-				ImGui.CloseCurrentPopup();
-			}
-
-			ImGui.PopStyleColor();
 		}
 	}
 }

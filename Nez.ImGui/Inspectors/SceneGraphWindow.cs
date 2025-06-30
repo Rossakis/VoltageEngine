@@ -18,6 +18,9 @@ public class SceneGraphWindow
 	private EntityPane _entityPane = new();
 	private ImGuiManager _imGuiManager;
 
+	string _entityFilterName;
+
+
 	#region Event Handlers
 
 	public event Action OnSaveEntityChanges;
@@ -102,6 +105,15 @@ public class SceneGraphWindow
 			if (NezImGui.CenteredButton("Save Changes", 0.7f))
 				ImGui.OpenPopup("save-changes");
 
+			NezImGui.MediumVerticalSpace();
+			if (NezImGui.CenteredButton("Add Entity", 0.6f))
+			{
+				_entityFilterName = "";
+				ImGui.OpenPopup("entity-selector");
+			}
+
+			DrawEntitySelectorPopup();
+
 			// Show Copied Component
 			NezImGui.MediumVerticalSpace();
 			if (_imGuiManager.SceneGraphWindow.CopiedComponent != null)
@@ -118,6 +130,57 @@ public class SceneGraphWindow
 			DrawSaveChangesPopup();
 
 			ImGui.End();
+		}
+	}
+	private string GetUniqueEntityName(string baseName)
+	{
+		int counter = 1;
+		string uniqueName = baseName;
+		while (Core.Scene.Entities.FindEntity(uniqueName) != null)
+		{
+			uniqueName = $"{baseName}{counter}";
+			counter++;
+		}
+		return uniqueName;
+	}
+
+	private void DrawEntitySelectorPopup()
+	{
+		if (ImGui.BeginPopup("entity-selector"))
+		{
+			ImGui.InputText("###EntityFilter", ref _entityFilterName, 25);
+			ImGui.Separator();
+
+			var isNezType = false;
+			foreach (var subclassType in InspectorCache.GetAllEntitySubclassTypes())
+			{
+				if (string.IsNullOrEmpty(_entityFilterName) ||
+				    subclassType.Name.ToLower().Contains(_entityFilterName.ToLower()))
+				{
+					// stick a separator in after custom Entities and before Nez Entities
+					if (!isNezType && subclassType.Namespace != null && subclassType.Namespace.StartsWith("Nez"))
+					{
+						isNezType = true;
+						ImGui.Separator();
+					}
+
+					if (ImGui.Selectable(subclassType.Name))
+					{
+						// Generate a unique name for the new entity
+						string baseName = subclassType.Name;
+						string uniqueName = GetUniqueEntityName(baseName);
+
+						// Create an instance of the selected Entity subclass and set its name
+						var entity = (Entity)Activator.CreateInstance(subclassType);
+						entity.Name = uniqueName;
+						entity.Transform.Position = Core.Scene.Camera.Transform.Position;
+						Core.Scene.AddEntity(entity);
+						ImGui.CloseCurrentPopup();
+					}
+				}
+			}
+
+			ImGui.EndPopup();
 		}
 	}
 

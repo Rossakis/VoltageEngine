@@ -973,19 +973,20 @@ public class Scene
 	/// adds an Entity to the Scene's Entities list
 	/// </summary>
 	/// <param name="entity">The Entity to add</param>
-	public Entity AddEntity(Entity entity)
+	public virtual Entity AddEntity(Entity entity)
 	{
-		return AddEntity<Entity>(entity);
+		AddEntity<Entity>(entity);
+		entity.InitParams();
+		return entity;
 	}
 
 	/// <summary>
 	/// adds an Entity to the Scene's Entities list
 	/// </summary>
 	/// <param name="entity">The Entity to add</param>
-	public T AddEntity<T>(T entity) where T : Entity
+	public virtual T AddEntity<T>(T entity) where T : Entity
 	{
-		Insist.IsFalse(Entities.Contains(entity), "You are attempting to add the same entity to a scene twice: {0}",
-			entity);
+		Insist.IsFalse(Entities.Contains(entity), "You are attempting to add the same entity to a scene twice: {0}", entity);
 		Entities.Add(entity);
 		entity.Scene = this;
 
