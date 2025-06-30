@@ -161,6 +161,9 @@ namespace Nez.Utils.Extensions
 			if (key == Keys.Back)
 				return (char) 8;
 
+			if (key == Keys.Delete)
+				return (char) 127;
+
 
 			if (key == Keys.Add)
 				return '+';
