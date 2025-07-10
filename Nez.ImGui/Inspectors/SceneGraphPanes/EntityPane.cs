@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
+using Nez.ECS;
 
 namespace Nez.ImGuiTools.SceneGraphPanes;
 
@@ -140,8 +141,19 @@ public class EntityPane
 			{
 				if (ImGui.Selectable("Clone Entity " + entity.Name))
 				{
-					var clone = entity.Clone(Core.Scene.Camera.Position);
-					entity.Scene.AddEntity(clone);
+					var typeName = entity.GetType().Name;
+					if (EntityFactoryRegistry.TryCreate(typeName, out var clone))
+					{
+						clone.IsPrefab = true;
+						clone.Name = Core.Scene.GetUniqueEntityName(typeName); // You may need to implement this utility
+						clone.Transform.Position = Core.Scene.Camera.Position;
+					}
+					else
+					{
+						// Fallback to old behavior if not registered
+						var fallbackClone = entity.Clone(Core.Scene.Camera.Position);
+						entity.Scene.AddEntity(fallbackClone);
+					}
 				}
 			}
 			else if (hasParameterlessCtor && InspectorCache.HasNonParameterlessChildEntity(entity))

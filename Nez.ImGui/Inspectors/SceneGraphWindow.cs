@@ -1,5 +1,6 @@
 using System;
 using ImGuiNET;
+using Nez.ECS;
 using Nez.ImGuiTools.SceneGraphPanes;
 using Nez.Utils;
 using Num = System.Numerics;
@@ -132,18 +133,8 @@ public class SceneGraphWindow
 			ImGui.End();
 		}
 	}
-	private string GetUniqueEntityName(string baseName)
-	{
-		int counter = 1;
-		string uniqueName = baseName;
-		while (Core.Scene.Entities.FindEntity(uniqueName) != null)
-		{
-			uniqueName = $"{baseName}{counter}";
-			counter++;
-		}
-		return uniqueName;
-	}
 
+	
 	private void DrawEntitySelectorPopup()
 	{
 		if (ImGui.BeginPopup("entity-selector"))
@@ -151,30 +142,25 @@ public class SceneGraphWindow
 			ImGui.InputText("###EntityFilter", ref _entityFilterName, 25);
 			ImGui.Separator();
 
-			var isNezType = false;
-			foreach (var subclassType in InspectorCache.GetAllEntitySubclassTypes())
+			foreach (var typeName in EntityFactoryRegistry.GetRegisteredTypes())
 			{
 				if (string.IsNullOrEmpty(_entityFilterName) ||
-				    subclassType.Name.ToLower().Contains(_entityFilterName.ToLower()))
+				    typeName.ToLower().Contains(_entityFilterName.ToLower()))
 				{
-					// stick a separator in after custom Entities and before Nez Entities
-					if (!isNezType && subclassType.Namespace != null && subclassType.Namespace.StartsWith("Nez"))
-					{
-						isNezType = true;
-						ImGui.Separator();
-					}
-
-					if (ImGui.Selectable(subclassType.Name))
+					if (ImGui.Selectable(typeName))
 					{
 						// Generate a unique name for the new entity
-						string baseName = subclassType.Name;
-						string uniqueName = GetUniqueEntityName(baseName);
+						string uniqueName = Core.Scene.GetUniqueEntityName(typeName);
 
-						// Create an instance of the selected Entity subclass and set its name
-						var entity = (Entity)Activator.CreateInstance(subclassType);
-						entity.Name = uniqueName;
-						entity.Transform.Position = Core.Scene.Camera.Transform.Position;
-						Core.Scene.AddEntity(entity);
+						// Use the factory registry to create the entity
+						if (EntityFactoryRegistry.TryCreate(typeName, out var entity))
+						{
+							entity.IsPrefab = true;
+							entity.Name = uniqueName;
+							entity.Transform.Position = Core.Scene.Camera.Transform.Position;
+							EntityFactoryRegistry.EntityCreated(entity);
+						}
+
 						ImGui.CloseCurrentPopup();
 					}
 				}

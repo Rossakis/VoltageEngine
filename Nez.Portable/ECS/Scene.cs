@@ -1055,5 +1055,17 @@ public class Scene
 		return Entities.FindComponentsOfType<T>();
 	}
 
+	public string GetUniqueEntityName(string baseName)
+	{
+		int counter = 1;
+		string uniqueName = baseName;
+		while (Entities.FindEntity(uniqueName) != null)
+		{
+			uniqueName = $"{baseName}_{counter}";
+			counter++;
+		}
+		return uniqueName;
+	}
+
 	#endregion
 }

@@ -22,6 +22,13 @@ public class Entity : IComparable<Entity>
 	public Scene Scene;
 
 	/// <summary>
+	/// Indicates if the entity is a prefab (reusable template) or not.
+	/// Hard-coded entities such as player are NOT prefabs, while platforms are for example.
+	/// If it's a prefab, we create a new instance of it when loading the scene, otherwise we only use its entity data for the existing entities.
+	/// </summary>
+	public bool IsPrefab;
+
+	/// <summary>
 	/// entity name. useful for doing scene-wide searches for an entity
 	/// </summary>
 	public string Name;
