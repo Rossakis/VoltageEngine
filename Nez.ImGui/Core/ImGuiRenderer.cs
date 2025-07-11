@@ -420,5 +420,10 @@ namespace Nez.ImGuiTools
 		}
 
 		#endregion
+
+		public bool IsTextureBound(IntPtr textureId)
+		{
+			return _loadedTextures.ContainsKey(textureId);
+		}
 	}
 }

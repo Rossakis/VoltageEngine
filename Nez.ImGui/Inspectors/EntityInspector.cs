@@ -13,7 +13,8 @@ public class EntityInspector
 {
 	public Entity Entity { get; }
 
-	public bool IsMainInspector { get; set; } 
+	public bool IsMainInspector { get; set; }
+	public float MainInspectorWidth => _mainInspectorWidth;
 
 	private string _entityWindowId = "entity-" + NezImGui.GetScopeId().ToString();
 	private bool _shouldFocusWindow;
@@ -170,5 +171,10 @@ public class EntityInspector
 	public void SetWindowFocus()
 	{
 		_shouldFocusWindow = true;
+	}
+
+	public void SetWidth(float width)
+	{
+	    _mainInspectorWidth = Math.Clamp(width, _minInspectorWidth, _maxInspectorWidth);
 	}
 }

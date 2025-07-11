@@ -18,6 +18,8 @@ public class SceneGraphWindow
 	private RenderersPane _renderersPane = new();
 	private EntityPane _entityPane = new();
 	private ImGuiManager _imGuiManager;
+	public float SceneGraphWidth => _sceneGraphWidth;
+
 
 	string _entityFilterName;
 
@@ -64,7 +66,7 @@ public class SceneGraphWindow
 	{
 		_postProcessorsPane.OnSceneChanged();
 		_renderersPane.OnSceneChanged();
-	}
+		}
 
 	public void Show(ref bool isOpen)
 	{
@@ -226,4 +228,8 @@ public class SceneGraphWindow
 		}
 	}
 
+	public void SetWidth(float width)
+	{
+	    _sceneGraphWidth = Math.Clamp(width, _minSceneGraphWidth, _maxSceneGraphWidth);
+	}
 }
