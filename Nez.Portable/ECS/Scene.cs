@@ -942,6 +942,22 @@ public class Scene
 
 	#endregion
 
+	#region Events
+
+	public static event Action OnFinishedAddingEntities;
+	public static event Action<Entity> OnFinishedAddingEntitiesWithData;
+
+	public static void InvokeFinishedAddingEntities()
+	{
+		OnFinishedAddingEntities?.Invoke();
+	}
+
+	public static void InvokeFinishedAddingEntitiesWithData(Entity entity)
+	{
+		OnFinishedAddingEntitiesWithData?.Invoke(entity);
+	}
+
+	#endregion
 
 	#region Entity Management
 

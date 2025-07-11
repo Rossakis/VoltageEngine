@@ -68,17 +68,6 @@ public class EntityList
 
 	#endregion
 
-	#region Events
-
-	public event Action OnFinishedAddingEntities;
-
-	private void InvokeFinishedAddingEntities()
-	{
-		OnFinishedAddingEntities?.Invoke();
-	}
-
-	#endregion
-
 	public void MarkEntityListUnsorted()
 	{
 		_isEntityListUnsorted = true;
@@ -235,7 +224,8 @@ public class EntityList
 
 			if (_isSceneStarted) //Make sure all entities are added properly before executing the event 
 			{
-				InvokeFinishedAddingEntities();
+				Scene.InvokeFinishedAddingEntities();
+				Scene.InvokeFinishedAddingEntitiesWithData(null);
 				_isSceneStarted = false;
 			}
 

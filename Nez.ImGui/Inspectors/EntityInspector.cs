@@ -13,9 +13,6 @@ public class EntityInspector
 {
 	public Entity Entity { get; }
 
-	/// <summary>
-	/// Main inspector is the one that persists to the right side of the screen, unlike the ones that are spawned wherever.
-	/// </summary>
 	public bool IsMainInspector { get; set; } 
 
 	private string _entityWindowId = "entity-" + NezImGui.GetScopeId().ToString();
@@ -25,77 +22,56 @@ public class EntityInspector
 	private List<IComponentInspector> _componentInspectors = new();
 
 	private float _mainInspectorWidth = 700f;
-	private float _minInspectorWidth = 400f;
+	private float _minInspectorWidth = 1f;
 	private float _maxInspectorWidth = Screen.MonitorWidth;
 
-	public EntityInspector(Entity entity)
+	public EntityInspector(Entity entity = null)
 	{
 		Entity = entity;
-		_transformInspector = new TransformInspector(Entity.Transform);
-
-		for (var i = 0; i < entity.Components.Count; i++)
-			_componentInspectors.Add(new ComponentInspector(entity.Components[i]));
+		if (Entity != null)
+		{
+			_transformInspector = new TransformInspector(Entity.Transform);
+			for (var i = 0; i < entity.Components.Count; i++)
+				_componentInspectors.Add(new ComponentInspector(entity.Components[i]));
+		}
 	}
 
 	public void Draw()
 	{
-		// check to see if we are still alive
-		if (Entity.IsDestroyed)
-		{
-			Core.GetGlobalManager<ImGuiManager>().StopInspectingEntity(this);
-			return;
-		}
-
-		if (_shouldFocusWindow)
-		{
-			_shouldFocusWindow = false;
-			ImGui.SetNextWindowFocus();
-			ImGui.SetNextWindowCollapsed(false);
-		}
-
-		// every 60 frames we check for newly added Components and add them
-		if (Time.FrameCount % 60 == 0)
-			for (var i = 0; i < Entity.Components.Count; i++)
-			{
-				var component = Entity.Components[i];
-				if (_componentInspectors
-					    .Where(inspector => inspector.Component != null && inspector.Component == component)
-					    .Count() == 0)
-					_componentInspectors.Insert(0, new ComponentInspector(component));
-			}
-
 		ImGuiWindowFlags windowFlags = ImGuiWindowFlags.None;
-
 		string InspectorName = IsMainInspector ? "MAIN Entity Inspector" : $"Entity Inspector";
+
 		if (IsMainInspector)
 		{
 			float topMargin = 33f;
 			float rightMargin = 10f;
-
-			// Calculate left edge so right edge is always at Screen.Width - rightMargin
 			float windowPosX = Screen.Width - _mainInspectorWidth - rightMargin;
 			float windowPosY = topMargin;
 			float windowHeight = Screen.Height - topMargin;
 
-			// Set position every frame, but size only once
 			ImGui.SetNextWindowPos(new Num.Vector2(windowPosX, windowPosY), ImGuiCond.Always);
 			ImGui.SetNextWindowSize(new Num.Vector2(_mainInspectorWidth, windowHeight), ImGuiCond.Once);
 		}
 		else
 		{
-			// Use a reasonable default size and let ImGui auto-size after first use
 			ImGui.SetNextWindowSize(new Num.Vector2(335, 400), ImGuiCond.FirstUseEver);
-			ImGui.SetNextWindowSizeConstraints(new Num.Vector2(335, 200), new Num.Vector2(800, 800)); // or whatever max you want
+			ImGui.SetNextWindowSizeConstraints(new Num.Vector2(335, 200), new Num.Vector2(800, 800));
 		}
 
 		var open = true;
-		if (ImGui.Begin($"{InspectorName}: {Entity.Name}###{_entityWindowId}", ref open, windowFlags))
+		if (ImGui.Begin($"{InspectorName}###{_entityWindowId}", ref open, windowFlags))
 		{
+			if (Entity == null)
+			{
+				ImGui.TextColored(new Num.Vector4(1, 1, 0, 1), "No entity selected.");
+				ImGui.End();
+				return;
+			}
+
 			if (IsMainInspector)
 			{
-				// Get the current window width and update _mainInspectorWidth
 				float currentWidth = ImGui.GetWindowSize().X;
-				if (Math.Abs(-_mainInspectorWidth) > 0.01f)
+				if (Math.Abs(currentWidth - _mainInspectorWidth) > 0.01f)
 					_mainInspectorWidth = Math.Clamp(currentWidth, _minInspectorWidth, _maxInspectorWidth);
 			}
 
@@ -125,7 +101,6 @@ public class EntityInspector
 			_transformInspector.Draw();
 			NezImGui.MediumVerticalSpace();
 
-			// watch out for removed Components
 			for (var i = _componentInspectors.Count - 1; i >= 0; i--)
 			{
 				if (_componentInspectors[i].Entity == null)
@@ -155,6 +130,9 @@ public class EntityInspector
 
 	private void DrawComponentSelectorPopup()
 	{
+		if (Entity == null)
+			return;
+
 		if (ImGui.BeginPopup("component-selector"))
 		{
 			ImGui.InputText("###ComponentFilter", ref _componentNameFilter, 25);
@@ -166,7 +144,6 @@ public class EntityInspector
 				if (string.IsNullOrEmpty(_componentNameFilter) ||
 				    subclassType.Name.ToLower().Contains(_componentNameFilter.ToLower()))
 				{
-					// stick a seperator in after custom Components and before Colliders
 					if (!isNezType && subclassType.Namespace.StartsWith("Nez"))
 					{
 						isNezType = true;
@@ -190,9 +167,6 @@ public class EntityInspector
 		}
 	}
 
-	/// <summary>
-	/// sets this EntityInspector to be focused the next time it is drawn
-	/// </summary>
 	public void SetWindowFocus()
 	{
 		_shouldFocusWindow = true;

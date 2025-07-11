@@ -73,6 +73,8 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		_themes = typeof(NezImGuiThemes).GetMethods(System.Reflection.BindingFlags.Static |
 		                                            System.Reflection.BindingFlags.Public);
 		SceneGraphWindow = new SceneGraphWindow();
+
+		Scene.OnFinishedAddingEntitiesWithData += InspectEntity;
 	}
 
 	/// <summary>
@@ -87,7 +89,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 
 		if (ShowSeperateGameWindow)
 			DrawGameWindow();
-		
+
 		DrawEntityInspectors(); 
 
 		for (var i = _drawCommands.Count - 1; i >= 0; i--)
@@ -238,6 +240,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	public void UnregisterDrawCommand(Action drawCommand)
 	{
 		_drawCommands.Remove(drawCommand);
+		Scene.OnFinishedAddingEntitiesWithData -= InspectEntity;
 	}
 
 	/// <summary>
@@ -301,7 +304,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		_entityInspectors.RemoveAt(_entityInspectors.IndexOf(entityInspector));
 	}
 
-	public void InspectEntity(Entity entity)
+	public void InspectEntity(Entity entity = null)
 	{
 		// Remove previous main inspector if present
 		_entityInspectors.RemoveAll(i => i.IsMainInspector);
