@@ -6,7 +6,8 @@ namespace Nez.ImGuiTools.SceneGraphPanes;
 
 public class EntityPane
 {
-	public static Collider _selectedEntityCollider; //Used for rendering a collider box for the currently selected entity
+	public static Collider
+		_selectedEntityCollider; //Used for rendering a collider box for the currently selected entity
 
 	/// <summary>
 	/// if this number of entites is exceeded we switch to a list clipper to keep things fast
@@ -40,7 +41,7 @@ public class EntityPane
 				DrawEntity(Core.Scene.Entities[i]);
 		}
 
-		
+
 		NezImGui.MediumVerticalSpace();
 	}
 
@@ -64,19 +65,9 @@ public class EntityPane
 		ImGui.OpenPopupOnItemClick("entityContextMenu", ImGuiPopupFlags.MouseButtonRight);
 		DrawEntityContextMenuPopup(entity);
 
-		// Double-click (not on arrow): open pop-out inspector
-		if (ImGui.IsMouseDoubleClicked(0) && ImGui.IsItemClicked() &&
+		if (ImGui.IsItemClicked(ImGuiMouseButton.Left) &&
 		    ImGui.GetMousePos().X - ImGui.GetItemRectMin().X > ImGui.GetTreeNodeToLabelSpacing())
-		{
-			Core.GetGlobalManager<ImGuiManager>().StartInspectingEntity(entity);
-		}
-		// Single-click (not on arrow): open constant inspector, but NOT if double-click
-		else if (ImGui.IsItemClicked(ImGuiMouseButton.Left) &&
-		         !ImGui.IsMouseDoubleClicked(0) &&
-		         ImGui.GetMousePos().X - ImGui.GetItemRectMin().X > ImGui.GetTreeNodeToLabelSpacing())
-		{
-			Core.GetGlobalManager<ImGuiManager>().InspectEntity(entity);
-		}
+			Core.GetGlobalManager<ImGuiManager>().OpenMainEntityInspector(entity);
 
 		// Move camera to the entity for inspection
 		if (ImGui.IsMouseClicked(0) && ImGui.IsItemClicked() &&
@@ -119,23 +110,24 @@ public class EntityPane
 				//Component Commands
 				NezImGui.SmallVerticalSpace();
 
-				int index = -1;
+				var index = -1;
 				for (var i = 0; i < entity.Components.Count; i++)
-				{
 					if (entity.Components[i].GetType() == _imGuiManager.SceneGraphWindow.CopiedComponent.GetType())
 					{
 						index = i;
 						break;
 					}
-				}
 
-				if(index > -1)
+				if (index > -1)
 				{
 					var temp = _imGuiManager.SceneGraphWindow.CopiedComponent;
 					entity.RemoveComponent(entity.Components[index]);
 					entity.AddComponent(temp);
 				}
 			}
+
+			if (ImGui.Selectable($"Open {entity.Name} in separate window"))
+				Core.GetGlobalManager<ImGuiManager>().OpenSeparateEntityInspector(entity);
 
 			//Entity Commands
 			if (ImGui.Selectable("Move Camera to " + entity.Name))

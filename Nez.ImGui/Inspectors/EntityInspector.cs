@@ -13,9 +13,6 @@ public class EntityInspector
 {
 	public Entity Entity { get; }
 
-	public bool IsMainInspector { get; set; }
-	public float MainInspectorWidth => _mainInspectorWidth;
-	public float MainInspectorPosY { get; private set; }
 
 	private string _entityWindowId = "entity-" + NezImGui.GetScopeId().ToString();
 	private bool _shouldFocusWindow;
@@ -23,58 +20,48 @@ public class EntityInspector
 	private TransformInspector _transformInspector;
 	private List<IComponentInspector> _componentInspectors = new();
 
-	private float _mainInspectorWidth = 500f;
-	private float _minInspectorWidth = 1f;
-	private float _maxInspectorWidth = Screen.MonitorWidth;
+	private ImGuiManager _imGuiManager;
 
-	public EntityInspector(Entity entity = null)
+	private int
+		_normalEntityInspector_PosOffset; // When we create many normal entity panels, each one will be created with an offset from one another by ImguiManager
+
+	public EntityInspector(Entity entity, int NormalInspector_PosOffset = 0)
 	{
 		Entity = entity;
-		if (Entity != null)
-		{
-			_transformInspector = new TransformInspector(Entity.Transform);
-			for (var i = 0; i < entity.Components.Count; i++)
-				_componentInspectors.Add(new ComponentInspector(entity.Components[i]));
-		}
+
+		_normalEntityInspector_PosOffset = NormalInspector_PosOffset;
+
+		// Move normal entity inspectors freely
+		ImGui.GetIO().ConfigWindowsMoveFromTitleBarOnly = false;
+
+		_transformInspector = new TransformInspector(Entity.Transform);
+		for (var i = 0; i < entity.Components.Count; i++)
+			_componentInspectors.Add(new ComponentInspector(entity.Components[i]));
 	}
 
 	public void Draw()
 	{
-		var inspectorName = IsMainInspector ? "MAIN Entity Inspector" : $"Entity Inspector";
+		if (_imGuiManager == null)
+			_imGuiManager = Core.GetGlobalManager<ImGuiManager>();
 
-		if (IsMainInspector)
-		{
-			var topMargin = 20f;
-			var windowPosX = Screen.Width - _mainInspectorWidth;
-			MainInspectorPosY = topMargin;
-			var windowHeight = Screen.Height - topMargin;
+		var topMargin = 20f;
+		var windowHeight = Screen.Height - topMargin;
 
-			ImGui.SetNextWindowPos(new Num.Vector2(windowPosX, MainInspectorPosY), ImGuiCond.Always);
-			ImGui.SetNextWindowSize(new Num.Vector2(_mainInspectorWidth, windowHeight), ImGuiCond.FirstUseEver);
-		}
-		else
-		{
-			ImGui.SetNextWindowSize(new Num.Vector2(335, 400), ImGuiCond.FirstUseEver);
-			ImGui.SetNextWindowSizeConstraints(new Num.Vector2(335, 200), new Num.Vector2(800, 800));
-		}
+		var pos = new Num.Vector2(Screen.Width / 2f, Screen.Height / 2f) -
+		          new Num.Vector2(_normalEntityInspector_PosOffset, -_normalEntityInspector_PosOffset);
+
+		ImGui.SetNextWindowPos(pos, ImGuiCond.Once);
+		ImGui.SetNextWindowSize(new Num.Vector2(_imGuiManager.MainEntityInspector.Width, windowHeight / 2f),
+			ImGuiCond.FirstUseEver);
 
 		var open = true;
-		if (ImGui.Begin($"{inspectorName}###{_entityWindowId}", ref open))
+		if (ImGui.Begin($"Inspector: {Entity.Name}###{_entityWindowId}", ref open))
 		{
 			if (Entity == null)
 			{
 				ImGui.TextColored(new Num.Vector4(1, 1, 0, 1), "No entity selected.");
 				ImGui.End();
 				return;
-			}
-
-			if (IsMainInspector)
-			{
-				var currentWidth = ImGui.GetWindowSize().X;
-
-				//If resizing the window manually
-				if (Math.Abs(currentWidth - _mainInspectorWidth) > 0.01f)
-					_mainInspectorWidth = Math.Clamp(currentWidth, _minInspectorWidth, _maxInspectorWidth);
 			}
 
 			var enabled = Entity.Enabled;
@@ -127,7 +114,7 @@ public class EntityInspector
 		}
 
 		if (!open)
-			Core.GetGlobalManager<ImGuiManager>().StopInspectingEntity(this);
+			_imGuiManager.CloseEntityInspector(this);
 	}
 
 	private void DrawComponentSelectorPopup()
@@ -135,16 +122,21 @@ public class EntityInspector
 		if (Entity == null)
 			return;
 
+		DrawComponentSelector(Entity, _componentNameFilter);
+	}
+
+	public static void DrawComponentSelector(Entity entity, string componentNameFilter)
+	{
 		if (ImGui.BeginPopup("component-selector"))
 		{
-			ImGui.InputText("###ComponentFilter", ref _componentNameFilter, 25);
+			ImGui.InputText("###ComponentFilter", ref componentNameFilter, 25);
 			ImGui.Separator();
 
 			var isNezType = false;
 			var isColliderType = false;
 			foreach (var subclassType in InspectorCache.GetAllComponentSubclassTypes())
-				if (string.IsNullOrEmpty(_componentNameFilter) ||
-				    subclassType.Name.ToLower().Contains(_componentNameFilter.ToLower()))
+				if (string.IsNullOrEmpty(componentNameFilter) ||
+				    subclassType.Name.ToLower().Contains(componentNameFilter.ToLower()))
 				{
 					if (!isNezType && subclassType.Namespace.StartsWith("Nez"))
 					{
@@ -160,7 +152,7 @@ public class EntityInspector
 
 					if (ImGui.Selectable(subclassType.Name))
 					{
-						Entity.AddComponent(Activator.CreateInstance(subclassType) as Component);
+						entity.AddComponent(Activator.CreateInstance(subclassType) as Component);
 						ImGui.CloseCurrentPopup();
 					}
 				}
@@ -172,10 +164,5 @@ public class EntityInspector
 	public void SetWindowFocus()
 	{
 		_shouldFocusWindow = true;
-	}
-
-	public void SetWidth(float width)
-	{
-		_mainInspectorWidth = Math.Clamp(width, _minInspectorWidth, _maxInspectorWidth);
 	}
 }

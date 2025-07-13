@@ -87,6 +87,9 @@ public class SceneGraphWindow
 		// Calculate left edge so right edge is always at Screen.Width - rightMargin
 		SceneGraphPosY = topMargin;
 
+		ImGui.PushStyleVar(ImGuiStyleVar.GrabMinSize, 0.0f); // makes grip almost invisible
+		ImGui.PushStyleColor(ImGuiCol.ResizeGrip, new Num.Vector4(0, 0, 0, 0)); // transparent grip
+
 		ImGui.SetNextWindowPos(new Num.Vector2(0, SceneGraphPosY), ImGuiCond.Always);
 		ImGui.SetNextWindowSize(new Num.Vector2(_sceneGraphWidth, windowHeight), ImGuiCond.FirstUseEver);
 
@@ -156,10 +159,11 @@ public class SceneGraphWindow
 					_imGuiManager.SceneGraphWindow.CopiedComponent = null;
 			}
 
-
 			DrawSaveChangesPopup();
 
 			ImGui.End();
+			ImGui.PopStyleVar();
+			ImGui.PopStyleColor();
 		}
 	}
 

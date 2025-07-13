@@ -30,7 +30,11 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 
 	private CoreWindow _coreWindow = new();
 	public SceneGraphWindow SceneGraphWindow { get; private set; }
-	public EntityInspector MainEntityInspector { get; private set; }
+	public MainEntityInspector MainEntityInspector { get; private set; }
+
+	private Num.Vector2 normalEntityInspectorStartPos;
+	private int entitynspectorInitialSpawnOffset = 0;
+	private static int entitynspectorSpawnOffsetIncremental = 20;
 
 	private SpriteAtlasEditorWindow _spriteAtlasEditorWindow;
 	private List<EntityInspector> _entityInspectors = new();
@@ -46,6 +50,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	private Num.Vector2? _gameViewForcedSize;
 	private WindowPosition? _gameViewForcedPos;
 	private float _mainMenuBarHeight;
+
 
 	public ImGuiManager(ImGuiOptions options = null)
 	{
@@ -77,7 +82,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		SceneGraphWindow = new SceneGraphWindow();
 
 		// Create default Main Entity Inspector window when current scene is finished loading the entities
-		Scene.OnFinishedAddingEntitiesWithData += InspectEntity;
+		Scene.OnFinishedAddingEntitiesWithData += OpenMainEntityInspector;
 	}
 
 	/// <summary>
@@ -92,6 +97,9 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 
 		if (ShowSeperateGameWindow)
 			DrawGameWindow();
+
+		if (MainEntityInspector != null)
+			MainEntityInspector.Draw();
 
 		DrawEntityInspectors();
 
@@ -241,7 +249,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	public void UnregisterDrawCommand(Action drawCommand)
 	{
 		_drawCommands.Remove(drawCommand);
-		Scene.OnFinishedAddingEntitiesWithData -= InspectEntity;
+		Scene.OnFinishedAddingEntitiesWithData -= OpenMainEntityInspector;
 	}
 
 	/// <summary>
@@ -265,27 +273,42 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	}
 
 	/// <summary>
-	/// creates an EntityInspector window
+	/// Creates a normal EntityInspector window
 	/// </summary>
 	/// <param name="entity"></param>
-	public void StartInspectingEntity(Entity entity)
+	public void OpenSeparateEntityInspector(Entity entity)
 	{
 		// Only add if not already present as a pop-out
-		if (_entityInspectors.Any(i => !i.IsMainInspector && i.Entity == entity))
+		if (_entityInspectors.Any(i => i.Entity == entity))
 			return;
 
-		var inspector = new EntityInspector(entity) { IsMainInspector = false };
-		inspector.SetWindowFocus();
+		entitynspectorInitialSpawnOffset += entitynspectorSpawnOffsetIncremental;
+		var inspector = new EntityInspector(entity, entitynspectorInitialSpawnOffset);
 		_entityInspectors.Add(inspector);
-		if (inspector.IsMainInspector)
-			MainEntityInspector = inspector;
+
+		inspector.SetWindowFocus();
+	}
+
+	/// <summary>
+	/// Creates (or replaces) a MainEntityInspector
+	/// </summary>
+	/// <param name="entity"></param>
+	public void OpenMainEntityInspector(Entity entity = null)
+	{
+		if (entity == null)
+			entity = Core.Scene.Camera.Entity;
+
+		if (MainEntityInspector != null && MainEntityInspector.Entity == entity)
+			return;
+
+		MainEntityInspector = new MainEntityInspector(entity);
 	}
 
 	/// <summary>
 	/// removes the EntityInspector for this Entity
 	/// </summary>
 	/// <param name="entity"></param>
-	public void StopInspectingEntity(Entity entity)
+	public void CloseEntityInspector(Entity entity)
 	{
 		for (var i = 0; i < _entityInspectors.Count; i++)
 		{
@@ -293,6 +316,11 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 			if (inspector.Entity == entity)
 			{
 				_entityInspectors.RemoveAt(i);
+
+				if (entitynspectorInitialSpawnOffset - entitynspectorSpawnOffsetIncremental >=
+				    0) // Reset the previous spawn offset 
+					entitynspectorInitialSpawnOffset -= entitynspectorSpawnOffsetIncremental;
+
 				return;
 			}
 		}
@@ -302,25 +330,18 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	/// removes the EntityInspector
 	/// </summary>
 	/// <param name="entityInspector"></param>
-	public void StopInspectingEntity(EntityInspector entityInspector)
+	public void CloseEntityInspector(EntityInspector entityInspector)
 	{
 		_entityInspectors.RemoveAt(_entityInspectors.IndexOf(entityInspector));
-		if (entityInspector.IsMainInspector)
-			MainEntityInspector = null;
+
+		if (entitynspectorInitialSpawnOffset - entitynspectorSpawnOffsetIncremental >=
+		    0) // Reset the previous spawn offset 
+			entitynspectorInitialSpawnOffset -= entitynspectorSpawnOffsetIncremental;
 	}
 
-	public void InspectEntity(Entity entity = null)
+	public void CloseMainEntityInspector()
 	{
-		if (entity == null) entity = Core.Scene.Camera.Entity;
-		// Remove previous main inspector if present
-		_entityInspectors.RemoveAll(i => i.IsMainInspector);
-
-		// Always create a new main inspector for the selected entity
-		var inspector = new EntityInspector(entity) { IsMainInspector = true };
-		_entityInspectors.Add(inspector);
-
-		if (inspector.IsMainInspector)
-			MainEntityInspector = inspector;
+		MainEntityInspector = null;
 	}
 
 	#endregion
