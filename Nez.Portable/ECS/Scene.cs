@@ -1071,16 +1071,37 @@ public class Scene
 		return Entities.FindComponentsOfType<T>();
 	}
 
+	/// <summary>
+	/// Pattern: BaseName + optional separator + optional1 number at the end e.g. Platform, Platform_1, Platform-1, Platform1
+	/// </summary>
+	/// <param name="baseName"></param>
+	/// <returns></returns>
 	public string GetUniqueEntityName(string baseName)
 	{
-		int counter = 1;
-		string uniqueName = baseName;
-		while (Entities.FindEntity(uniqueName) != null)
+		var baseLower = baseName.ToLower();
+
+		var allNames = new List<string>();
+		for (var i = 0; i < Entities.Count; i++)
+			allNames.Add(Entities[i].Name.ToLower());
+
+		// If baseName is available, return it
+		if (!allNames.Contains(baseLower))
+			return baseName;
+
+		// Match names like: entity, entity_1, entity-1, entity1
+		var pattern = @"^" + System.Text.RegularExpressions.Regex.Escape(baseLower) + @"(?:[_\-]?(\d+))?$";
+		var maxNum = 0;
+
+		foreach (var name in allNames)
 		{
-			uniqueName = $"{baseName}" + "_" + "{counter}";
-			counter++;
+			var match = System.Text.RegularExpressions.Regex.Match(name, pattern);
+			if (match.Success)
+				if (int.TryParse(match.Groups[1].Value, out var num))
+					if (num > maxNum)
+						maxNum = num;
 		}
-		return uniqueName;
+
+		return $"{baseName}_{maxNum + 1}";
 	}
 
 	#endregion

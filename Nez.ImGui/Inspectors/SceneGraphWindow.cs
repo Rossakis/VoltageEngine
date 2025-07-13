@@ -189,7 +189,7 @@ public class SceneGraphWindow
 							entity.IsPrefab = true;
 							entity.Name = uniqueName;
 							entity.Transform.Position = Core.Scene.Camera.Transform.Position;
-							EntityFactoryRegistry.EntityCreated(entity);
+							EntityFactoryRegistry.InvokeEntityCreated(entity);
 						}
 
 						ImGui.CloseCurrentPopup();

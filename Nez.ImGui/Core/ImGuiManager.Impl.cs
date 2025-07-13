@@ -277,7 +277,6 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		// it is outside the scaled portion)
 		normalizedPos /= scale;
 
-
 		// trick the input system. Take our normalizedPos and undo the scale and offsets (do the
 		// reverse of what Input.scaledPosition does) so that any consumers of mouse input can get
 		// the correct coordinates.

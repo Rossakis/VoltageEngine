@@ -17,6 +17,8 @@ public class EntityList
 	/// </summary>
 	private FastList<Entity> _entities = new();
 
+	public FastList<Entity> EntityFastList => _entities;
+
 	/// <summary>
 	/// The list of entities that were added this frame. Used to group the entities so we can process them simultaneously
 	/// </summary>

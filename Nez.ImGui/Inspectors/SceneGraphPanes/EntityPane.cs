@@ -146,7 +146,7 @@ public class EntityPane
 						clone.IsPrefab = true;
 						clone.Name = Core.Scene.GetUniqueEntityName(typeName);
 						clone.Transform.Position = Core.Scene.Camera.Position;
-						EntityFactoryRegistry.EntityCreated(clone);
+						EntityFactoryRegistry.InvokeEntityCreated(clone);
 					}
 					else
 					{

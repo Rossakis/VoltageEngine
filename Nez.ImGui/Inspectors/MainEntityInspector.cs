@@ -39,11 +39,9 @@ public class MainEntityInspector
 
 	public void Draw()
 	{
-		if (!IsOpen || Entity == null)
+		if (!IsOpen)
 			return;
 
-
-		var windowTitle = $"Main Inspector##{_windowId}";
 		var topMargin = 20f;
 		var fixedHeight = Screen.Height - topMargin;
 
@@ -60,6 +58,9 @@ public class MainEntityInspector
 
 
 		var open = IsOpen;
+		var entityName = Entity != null ? Entity.Name : "";
+		var windowTitle = $"Main Inspector: {entityName}##{_windowId}";
+
 		if (ImGui.Begin(windowTitle, ref open, ImGuiWindowFlags.None))
 		{
 			if (Entity == null)
