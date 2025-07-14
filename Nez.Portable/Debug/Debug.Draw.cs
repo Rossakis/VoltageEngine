@@ -1,8 +1,9 @@
 ﻿using Microsoft.Xna.Framework;
-using System.Collections.Generic;
+using Microsoft.Xna.Framework.Graphics;
 using Nez.BitmapFonts;
-using System.Diagnostics;
 using Nez.Utils.Fonts;
+using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace Nez
 {
@@ -160,6 +161,35 @@ namespace Nez
 				return;
 
 			_screenSpaceDebugDrawItems.Add(new DebugDrawItem(text, color, duration, scale));
+		}
+
+		/// <summary>
+		/// Draws an arrow from start to end, with customizable arrowhead.
+		/// </summary>
+		public static void DrawArrow(Vector2 start, Vector2 end, float headLength = 12f, float headWidth = 3f, Color color = default, float duration = 0f)
+		{
+			DrawLine(start, end, color, duration);
+
+			// Calculate direction
+			var direction = end - start;
+			if (direction.LengthSquared() < 0.01f)
+				return;
+
+			direction.Normalize();
+
+			// Arrowhead base
+			var arrowBase = end - direction * headLength;
+
+			// Perpendicular vector
+			var perp = new Vector2(-direction.Y, direction.X);
+
+			// Arrowhead points
+			var left = arrowBase + perp * headWidth;
+			var right = arrowBase - perp * headWidth;
+
+			// Draw arrowhead (as lines)
+			DrawLine(end, left, color, duration);
+			DrawLine(end, right, color, duration);
 		}
 	}
 }

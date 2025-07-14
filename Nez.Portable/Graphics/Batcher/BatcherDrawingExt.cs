@@ -99,7 +99,7 @@ namespace Nez
 		{
 			if (points.Length < 2)
 				return;
-
+			
 			batcher.SetIgnoreRoundingDestinations(true);
 			for (int i = 1; i < points.Length; i++)
 				DrawLine(batcher, position + points[i - 1], position + points[i], color, thickness);

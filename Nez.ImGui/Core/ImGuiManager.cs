@@ -51,6 +51,13 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	private WindowPosition? _gameViewForcedPos;
 	private float _mainMenuBarHeight;
 
+	// Camera Params
+	public static float EditModeCameraSpeed = 250f;
+	public static float EditModeCameraFastSpeed = 500f;
+	public static float CurrentCameraSpeed { get; private set; }
+
+	private Vector2 _cameraTargetPosition;
+	private float _cameraLerp = 0.4f; 
 
 	public ImGuiManager(ImGuiOptions options = null)
 	{
@@ -122,6 +129,8 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 			ImGui.ShowStyleEditor();
 			ImGui.End();
 		}
+
+		UpdateCamera();
 	}
 
 	/// <summary>
@@ -228,6 +237,37 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	{
 		for (var i = _entityInspectors.Count - 1; i >= 0; i--)
 			_entityInspectors[i].Draw();
+	}
+
+	private void UpdateCamera()
+	{
+		if (Input.IsKeyPressed(Keys.F1) || Input.IsKeyPressed(Keys.F2)) // Switch modes
+			SceneGraphWindow.InvokeSwitchEditMode(Core.IsEditMode = !Core.IsEditMode);
+
+		if (Core.IsEditMode)
+		{
+			// Initialize target position if needed
+			if (_cameraTargetPosition == default)
+				_cameraTargetPosition = Core.Scene.Camera.Position;
+
+			if (Input.IsKeyDown(Keys.LeftShift))
+				CurrentCameraSpeed = EditModeCameraFastSpeed;
+			else
+				CurrentCameraSpeed = EditModeCameraSpeed;
+
+			// Move target position with WASD
+			if (Input.IsKeyDown(Keys.D))
+				_cameraTargetPosition += new Vector2(CurrentCameraSpeed, 0) * Time.DeltaTime;
+			if (Input.IsKeyDown(Keys.A))
+				_cameraTargetPosition -= new Vector2(CurrentCameraSpeed, 0) * Time.DeltaTime;
+			if (Input.IsKeyDown(Keys.W))
+				_cameraTargetPosition -= new Vector2(0, CurrentCameraSpeed) * Time.DeltaTime;
+			if (Input.IsKeyDown(Keys.S))
+				_cameraTargetPosition += new Vector2(0, CurrentCameraSpeed) * Time.DeltaTime;
+
+			// Smoothly interpolate camera position towards target
+			Core.Scene.Camera.Position = Vector2.Lerp(Core.Scene.Camera.Position, _cameraTargetPosition, _cameraLerp);
+		}
 	}
 
 
