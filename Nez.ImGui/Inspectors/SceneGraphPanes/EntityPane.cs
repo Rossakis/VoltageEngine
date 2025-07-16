@@ -34,6 +34,8 @@ public class EntityPane
     private bool _draggingY = false;
     private Vector2 _dragStartMouse;
     private Vector2 _dragStartEntityPos;
+    private Vector2 _dragStartEntityToCameraOffset;
+    private Vector2 _dragStartWorldMouse;
 
 
 	#endregion
@@ -134,89 +136,59 @@ public class EntityPane
     // Start dragging if not already dragging
     if (!_draggingX && !_draggingY)
     {
-        if (xHovered && yHovered && Input.LeftMouseButtonPressed)
+        if ((xHovered && yHovered && Input.LeftMouseButtonPressed) ||
+            (xHovered && Input.LeftMouseButtonPressed) ||
+            (yHovered && Input.LeftMouseButtonPressed))
         {
-            _draggingX = true;
-            _draggingY = true;
+            if (xHovered && yHovered)
+            {
+                _draggingX = true;
+                _draggingY = true;
+            }
+            else if (xHovered)
+            {
+                _draggingX = true;
+            }
+            else if (yHovered)
+            {
+                _draggingY = true;
+            }
+
             _dragStartMouse = mousePos;
             _dragStartEntityPos = entityPos;
-        }
-        else if (xHovered && Input.LeftMouseButtonPressed)
-        {
-            _draggingX = true;
-            _dragStartMouse = mousePos;
-            _dragStartEntityPos = entityPos;
-        }
-        else if (yHovered && Input.LeftMouseButtonPressed)
-        {
-            _draggingY = true;
-            _dragStartMouse = mousePos;
-            _dragStartEntityPos = entityPos;
+            _dragStartEntityToCameraOffset = entityPos - camera.Position;
+            _dragStartWorldMouse = camera.ScreenToWorldPoint(mousePos);
         }
     }
 
-    Vector2 cameraDelta = camera.Position - prevCameraPos;
+    // Keep dragging as long as mouse is held down 
+    if ((_draggingX || _draggingY) && Input.LeftMouseButtonDown)
+    {
+        var worldMouse = camera.ScreenToWorldPoint(mousePos);
+        var delta = worldMouse - _dragStartWorldMouse;
 
-    // --- Modified drag logic: keep dragging as long as mouse is held down ---
+        if (_draggingX && _draggingY)
+        {
+            ImGui.SetMouseCursor(ImGuiMouseCursor.ResizeAll);
+            _selectedEntity.Transform.Position = _dragStartEntityPos + delta;
+        }
+        else if (_draggingX)
+        {
+            ImGui.SetMouseCursor(ImGuiMouseCursor.ResizeEW);
+            _selectedEntity.Transform.Position = new Vector2(_dragStartEntityPos.X + delta.X, _selectedEntity.Transform.Position.Y);
+        }
+        else if (_draggingY)
+        {
+            ImGui.SetMouseCursor(ImGuiMouseCursor.ResizeNS);
+            _selectedEntity.Transform.Position = new Vector2(_selectedEntity.Transform.Position.X, _dragStartEntityPos.Y + delta.Y);
+        }
+    }
+
+    // End dragging when mouse button is released
     if ((_draggingX || _draggingY) && !Input.LeftMouseButtonDown)
     {
-        // Stop dragging when mouse is released
         _draggingX = false;
         _draggingY = false;
-    }
-    else if (_draggingX && _draggingY)
-    {
-        ImGui.SetMouseCursor(ImGuiMouseCursor.ResizeAll);
-        if (Input.LeftMouseButtonDown)
-        {
-            if (cameraDelta != Vector2.Zero)
-            {
-                _selectedEntity.Transform.Position += cameraDelta;
-            }
-            else
-            {
-                var worldMouse = camera.ScreenToWorldPoint(mousePos);
-                var worldStart = camera.ScreenToWorldPoint(_dragStartMouse);
-                var delta = worldMouse - worldStart;
-                _selectedEntity.Transform.Position = _dragStartEntityPos + delta;
-            }
-        }
-    }
-    else if (_draggingX)
-    {
-        ImGui.SetMouseCursor(ImGuiMouseCursor.ResizeEW);
-        if (Input.LeftMouseButtonDown)
-        {
-            if (cameraDelta.X != 0)
-            {
-                _selectedEntity.Transform.Position += new Vector2(cameraDelta.X, 0);
-            }
-            else
-            {
-                var worldMouse = camera.ScreenToWorldPoint(mousePos);
-                var worldStart = camera.ScreenToWorldPoint(_dragStartMouse);
-                float deltaX = worldMouse.X - worldStart.X;
-                _selectedEntity.Transform.Position = new Vector2(_dragStartEntityPos.X + deltaX, _selectedEntity.Transform.Position.Y);
-            }
-        }
-    }
-    else if (_draggingY)
-    {
-        ImGui.SetMouseCursor(ImGuiMouseCursor.ResizeNS);
-        if (Input.LeftMouseButtonDown)
-        {
-            if (cameraDelta.Y != 0)
-            {
-                _selectedEntity.Transform.Position += new Vector2(0, cameraDelta.Y);
-            }
-            else
-            {
-                var worldMouse = camera.ScreenToWorldPoint(mousePos);
-                var worldStart = camera.ScreenToWorldPoint(_dragStartMouse);
-                float deltaY = worldMouse.Y - worldStart.Y;
-                _selectedEntity.Transform.Position = new Vector2(_selectedEntity.Transform.Position.X, _dragStartEntityPos.Y + deltaY);
-            }
-        }
     }
 
     prevCameraPos = camera.Position;
