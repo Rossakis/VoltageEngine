@@ -490,11 +490,52 @@ public class Entity : IComparable<Entity>
 	/// <typeparam name="T">The 1st type parameter.</typeparam>
 	public T AddComponent<T>(T component) where T : Component
 	{
+		// Ensure unique name for multiple components of the same type
+		var type = component.GetType();
+		var existingComponents = new List<T>();
+		Components.GetComponents(existingComponents);
+
+		int maxIndex = -1;
+		foreach (var comp in existingComponents)
+		{
+			if (comp.GetType() == type)
+			{
+				if (!string.IsNullOrEmpty(comp.Name))
+				{
+					// Check for pattern: TypeName or TypeName_N
+					if (comp.Name == type.Name)
+					{
+						maxIndex = Math.Max(maxIndex, 0);
+					}
+					else if (comp.Name.StartsWith(type.Name + "_"))
+					{
+						var suffix = comp.Name.Substring(type.Name.Length + 1);
+						if (int.TryParse(suffix, out int idx))
+							maxIndex = Math.Max(maxIndex, idx);
+					}
+				}
+				else
+				{
+					maxIndex = Math.Max(maxIndex, 0);
+				}
+			}
+		}
+
+		// Assign unique name if needed
+		if (maxIndex >= 0)
+		{
+			component.Name = $"{type.Name}_{maxIndex + 1}";
+		}
+		else if (string.IsNullOrEmpty(component.Name))
+		{
+			component.Name = type.Name;
+		}
+
 		component.Entity = this;
 		Components.Add(component);
 		component.Initialize();
 		if (Scene != null)
-            Scene.TriggerComponentAddedCallbacks(component);
+			Scene.TriggerComponentAddedCallbacks(component);
 		return component;
 	}
 
@@ -506,12 +547,7 @@ public class Entity : IComparable<Entity>
 	public T AddComponent<T>() where T : Component, new()
 	{
 		var component = new T();
-		component.Entity = this;
-		Components.Add(component);
-		component.Initialize();
-		if (Scene != null)
-            Scene.TriggerComponentAddedCallbacks(component);
-		return component;
+		return AddComponent(component);
 	}
 
 	/// <summary>

@@ -34,14 +34,28 @@ public static class EntityFactoryRegistry
 	/// <returns></returns>
 	public static bool TryCreate(string typeName, out Entity entity)
 	{
-		if (_factories.TryGetValue(typeName, out var factory))
+		try
 		{
-			entity = factory();
+			entity = Create(typeName);
 			return true;
 		}
+		catch
+		{
+			entity = null;
+			return false;
+		}
+	}
 
-		entity = null;
-		return false;
+	public static Entity Create(string typeName)
+	{
+		if (_factories.TryGetValue(typeName, out var factory))
+		{
+			return factory();
+		}
+
+		throw new InvalidOperationException(
+			$"EntityFactoryRegistry: Entity type '{typeName}' is not registered in the factory. " +
+			$"Did you forget to call EntityFactoryRegistry.Register(\"{typeName}\", ...)?");
 	}
 
 	public static IEnumerable<string> GetRegisteredTypes()

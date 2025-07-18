@@ -13,6 +13,7 @@ public abstract class ComponentData { }
 public struct ComponentDataEntry
 {
 	public string ComponentTypeName;
+	public string ComponentName; // In case there are multiple components of the same type on an Entity, this is used to differentiate them.
 	public string DataTypeName;
 	public string Json;
 }

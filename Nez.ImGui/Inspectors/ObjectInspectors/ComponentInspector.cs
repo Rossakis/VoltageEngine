@@ -22,18 +22,18 @@ namespace Nez.ImGuiTools.ObjectInspectors
 			_component = component;
 			_inspectors = TypeInspectorUtils.GetInspectableProperties(component);
 
-			if (_component.GetType().IsGenericType)
-			{
-				var genericType = _component.GetType().GetGenericArguments()[0].Name;
-				_name = $"{_component.GetType().BaseType.Name}<{genericType}>";
-			}
+			var typeName = _component.GetType().IsGenericType
+				? $"{_component.GetType().BaseType.Name}<{_component.GetType().GetGenericArguments()[0].Name}>"
+				: _component.GetType().Name;
+
+			// If the component's name is null or empty, treat it as the type name
+			var compName = string.IsNullOrEmpty(_component.Name) ? typeName : _component.Name;
+
+			// Show only type if name matches type, otherwise show "Name (Type)"
+			if (compName == typeName)
+				_name = typeName;
 			else
-			{
-				if(_component.Name != null)
-					_name = _component.Name + $" ({_component.GetType().Name})";
-				else
-					_name = _component.GetType().Name;
-			}
+				_name = $"{compName} ({typeName})";
 
 			var methods = TypeInspectorUtils.GetAllMethodsWithAttribute<InspectorDelegateAttribute>(_component.GetType());
 			foreach (var method in methods)
