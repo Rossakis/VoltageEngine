@@ -173,8 +173,6 @@ public class SceneGraphWindow
 				_showTmxFilePicker = false;
 			}
 
-			ShowTmxFilePickerPopup();
-
 			// Show Copied Component
 			NezImGui.MediumVerticalSpace();
 			if (CopiedComponent != null)
@@ -187,13 +185,14 @@ public class SceneGraphWindow
 					CopiedComponent = null;
 			}
 
+			DrawTmxFilePickerPopup();
 			DrawSaveChangesPopup();
+			DrawEntitySelectorPopup();
 
 			ImGui.End();
 			ImGui.PopStyleVar();
 			ImGui.PopStyleColor();
 		}
-
 
 		// Control + S = Save ALL
 		if (Input.IsKeyDown(Keys.LeftControl) && Input.IsKeyPressed(Keys.S))
@@ -268,7 +267,7 @@ public class SceneGraphWindow
 
 	private void HandleEntitySelectionNavigation()
 	{
-		if (!Nez.Core.IsEditMode)
+		if (!Core.IsEditMode)
 			return; 
 
 		var hierarchyList = BuildHierarchyList();
@@ -439,7 +438,7 @@ public class SceneGraphWindow
 		}
 	}
 
-	private void ShowTmxFilePickerPopup()
+	private void DrawTmxFilePickerPopup()
 	{
 		bool isOpen = true;
 		if (ImGui.BeginPopupModal("tmx-file-picker", ref isOpen, ImGuiWindowFlags.AlwaysAutoResize))
