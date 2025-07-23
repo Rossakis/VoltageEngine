@@ -6,7 +6,7 @@ namespace Nez.Utils
 	/// <summary>
 	/// utility methods that don't yet have a proper home that makes sense
 	/// </summary>
-	public static class Utils
+	public static partial class Utils
 	{
 		public static string RandomString(int size = 38)
 		{

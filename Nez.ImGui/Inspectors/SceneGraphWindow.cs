@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using ImGuiNET;
 using Microsoft.Xna.Framework.Input;
 using Nez.ECS;
@@ -37,6 +38,11 @@ public class SceneGraphWindow
 	private const float RepeatDelay = 0.3f; // seconds before repeat starts
 	private const float RepeatRate = 0.08f; // seconds between repeats
 	public HashSet<Entity> ExpandedEntities = new();
+
+	// TiledMap (tmx) File Picker
+	private bool _showTmxFilePicker = false;
+	private string _selectedTmxFile = null;
+	public static event Action<string> OnTmxFileSelected;
 
 	#region Event Handlers
 
@@ -155,7 +161,19 @@ public class SceneGraphWindow
 				ImGui.OpenPopup("entity-selector");
 			}
 
-			DrawEntitySelectorPopup();
+			NezImGui.MediumVerticalSpace();
+			if (NezImGui.CenteredButton("Load Tiled Map", 0.6f))
+			{
+				_showTmxFilePicker = true;
+			}
+
+			if (_showTmxFilePicker)
+			{
+				ImGui.OpenPopup("tmx-file-picker");
+				_showTmxFilePicker = false;
+			}
+
+			ShowTmxFilePickerPopup();
 
 			// Show Copied Component
 			NezImGui.MediumVerticalSpace();
@@ -419,5 +437,47 @@ public class SceneGraphWindow
 					stack.Push(child);
 			}
 		}
+	}
+
+	private void ShowTmxFilePickerPopup()
+	{
+		bool isOpen = true;
+		if (ImGui.BeginPopupModal("tmx-file-picker", ref isOpen, ImGuiWindowFlags.AlwaysAutoResize))
+		{
+			var picker = FilePicker.GetFilePicker(this, Path.Combine(Environment.CurrentDirectory, "Content"), ".tmx");
+			picker.DontAllowTraverselBeyondRootFolder = true;
+			if (picker.Draw())
+			{
+				var file = picker.SelectedFile;
+				if (file.EndsWith(".tmx"))
+				{
+					string fullPath = file;
+					string contentRoot = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, "Content"));
+
+					if (fullPath.StartsWith(contentRoot, StringComparison.OrdinalIgnoreCase))
+					{
+						string relativePath = "Content" + fullPath.Substring(contentRoot.Length).Replace('\\', '/');
+						HandleTmxFileSelected(relativePath);
+						ImGui.CloseCurrentPopup();
+					}
+					else
+					{
+						ImGui.Text("Selected file is not inside Content folder!");
+					}
+				}
+				else
+				{
+					ImGui.Text("Selected file is not a valid TMX file.");
+				}
+				FilePicker.RemoveFilePicker(this);
+			}
+			ImGui.EndPopup();
+		}
+	}
+
+	private void HandleTmxFileSelected(string relativePath)
+	{
+		_selectedTmxFile = relativePath;
+		OnTmxFileSelected?.Invoke(relativePath);
 	}
 }

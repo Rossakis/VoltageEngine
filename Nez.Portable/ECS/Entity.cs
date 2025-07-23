@@ -4,20 +4,10 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
 using Microsoft.Xna.Framework;
+using Nez.Data;
 using Nez.Persistence;
 
 namespace Nez;
-
-[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
-public class EntityData : Component
-{
-	public List<ComponentDataEntry> ComponentDataList;
-
-	public EntityData()
-    {
-	    ComponentDataList = new List<ComponentDataEntry>();
-	}
-}
 
 [JsonSerializable(typeof(Entity))]
 public class Entity : IComparable<Entity>

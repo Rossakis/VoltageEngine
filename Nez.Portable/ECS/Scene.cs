@@ -4,8 +4,7 @@ using Microsoft.Xna.Framework;
 using Nez.Systems;
 using Nez.Textures;
 using Microsoft.Xna.Framework.Graphics;
-using Nez.ECS;
-using Nez.Persistence;
+using Nez.Data;
 using Nez.Utils;
 using Nez.Utils.Collections;
 using Nez.Utils.Extensions;
@@ -85,6 +84,7 @@ public class Scene
 		BestFit
 	}
 
+	public SceneData SceneData;
 
 	/// <summary>
 	/// default scene Camera

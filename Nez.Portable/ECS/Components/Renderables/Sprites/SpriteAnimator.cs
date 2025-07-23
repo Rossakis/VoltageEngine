@@ -32,8 +32,8 @@ public class SpriteAnimator : SpriteRenderer, IUpdatable
 		public string CurrentAnimationName { get; set; }
 		public int CurrentFrame { get; set; }
 		public float CurrentElapsedTime { get; set; }
-		public SpriteAnimator.LoopMode CurrentLoopMode { get; set; }
-		public SpriteAnimator.State AnimationState { get; set; }
+		public LoopMode CurrentLoopMode { get; set; }
+		public State AnimationState { get; set; }
 
 		public SpriteAnimatorComponentData() { }
 
