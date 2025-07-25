@@ -428,17 +428,15 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 
 	private void ManageUndoAndRedo()
 	{
-		// Check for Ctrl+Z (Undo)
-		var io = ImGui.GetIO();
-		bool ctrlDown = io.KeyCtrl;
-		bool zPressed = ImGui.IsKeyPressed(ImGuiKey.Z, false);
-
-		if (ctrlDown && zPressed)
+		if (ImGui.GetIO().KeyCtrl && ImGui.IsKeyPressed(ImGuiKey.Z, false))
 		{
 			EditorChangeTracker.Undo();
 		}
 
-		//TODO: Ctrl + Y
+		if (ImGui.GetIO().KeyCtrl && ImGui.IsKeyPressed(ImGuiKey.Y, false))
+		{
+			EditorChangeTracker.Redo();
+		}
 
 	}
 

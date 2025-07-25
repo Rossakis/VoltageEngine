@@ -10,12 +10,26 @@ public class GenericValueChangeAction : EditorChangeTracker.IEditorAction
     private readonly object _newValue;
     private readonly string _description;
 
+    // For delegate-based value setting
+    private readonly Action<object, object> _setter;
+
     public string Description => _description;
 
+    // Reflection-based constructor (existing)
     public GenericValueChangeAction(object target, MemberInfo member, object oldValue, object newValue, string description)
     {
         _target = target;
         _member = member;
+        _oldValue = oldValue;
+        _newValue = newValue;
+        _description = description;
+    }
+
+    // Delegate-based constructor (new)
+    public GenericValueChangeAction(object target, Action<object, object> setter, object oldValue, object newValue, string description)
+    {
+        _target = target;
+        _setter = setter;
         _oldValue = oldValue;
         _newValue = newValue;
         _description = description;
@@ -26,14 +40,21 @@ public class GenericValueChangeAction : EditorChangeTracker.IEditorAction
 
     private void SetValue(object value)
     {
-        switch (_member)
+        if (_setter != null)
         {
-            case PropertyInfo prop:
-                prop.SetValue(_target, value);
-                break;
-            case FieldInfo field:
-                field.SetValue(_target, value);
-                break;
+            _setter(_target, value);
+        }
+        else
+        {
+            switch (_member)
+            {
+                case PropertyInfo prop:
+                    prop.SetValue(_target, value);
+                    break;
+                case FieldInfo field:
+                    field.SetValue(_target, value);
+                    break;
+            }
         }
     }
 }

@@ -3,6 +3,7 @@ using Nez.ImGuiTools.ObjectInspectors;
 using Nez.Utils;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using Num = System.Numerics;
 
@@ -23,6 +24,9 @@ public class MainEntityInspector
 	private TransformInspector _transformInspector;
 	private List<IComponentInspector> _componentInspectors = new();
 	private string _componentNameFilter;
+
+	private bool _isEditingUpdateInterval = false;
+	private uint _updateIntervalEditStartValue;
 
 	public MainEntityInspector(Entity entity = null)
 	{
@@ -96,47 +100,149 @@ public class MainEntityInspector
 				var type = Entity.Type.ToString();
 				ImGui.InputText("InstanceType", ref type, 30);
 
-				var enabled = Entity.Enabled;
-				if (ImGui.Checkbox("Enabled", ref enabled))
-					Entity.Enabled = enabled;
-
-				ImGui.InputText("Name", ref Entity.Name, 25);
-
-				// TODO:
-				int oldUpdateOrder = Entity.UpdateOrder;
-				int updateOrder = Entity.UpdateOrder;
-				if (ImGui.InputInt("Update Order", ref updateOrder))
+				// Enabled
 				{
-					// Get the PropertyInfo for the UpdateOrder property
-					var propertyInfo = typeof(Entity).GetProperty(nameof(Entity.UpdateOrder));
-
-					// Create the undo/redo action
-					var action = new GenericValueChangeAction(
-						Entity,
-						propertyInfo,
-						oldUpdateOrder,
-						updateOrder,
-						$"{Entity.Name}.UpdateOrder"
-					);
-
-					// Push to the tracker (also marks as dirty)
-					EditorChangeTracker.PushUndo(action, Entity, $"{Entity.Name}.UpdateOrder");
-
-					// Actually apply the change
-					Entity.SetUpdateOrder(updateOrder);
+					bool oldEnabled = Entity.Enabled;
+					bool enabled = oldEnabled;
+					if (ImGui.Checkbox("Enabled", ref enabled) && enabled != oldEnabled)
+					{
+						EditorChangeTracker.PushUndo(
+							new GenericValueChangeAction(
+								Entity,
+								typeof(Entity).GetProperty(nameof(Entity.Enabled)),
+								oldEnabled,
+								enabled,
+								$"{Entity.Name}.Enabled"
+							),
+							Entity,
+							$"{Entity.Name}.Enabled"
+						);
+						Entity.SetEnabled(enabled);
+					}
 				}
 
-				var updateInterval = (int)Entity.UpdateInterval;
-				if (ImGui.SliderInt("Update Interval", ref updateInterval, 1, 100))
-					Entity.UpdateInterval = (uint)updateInterval;
+				// Name
+				{
+					string oldName = Entity.Name;
+					string name = oldName;
+					if (ImGui.InputText("Name", ref name, 25) && name != oldName)
+					{
+						EditorChangeTracker.PushUndo(
+							new GenericValueChangeAction(
+								Entity,
+								typeof(Entity).GetProperty(nameof(Entity.Name)),
+								oldName,
+								name,
+								$"{Entity.Name}.Name"
+							),
+							Entity,
+							$"{Entity.Name}.Name"
+						);
+						Entity.Name = name;
+					}
+				}
 
-				var tag = Entity.Tag;
-				if (ImGui.InputInt("Tag", ref tag))
-					Entity.Tag = tag;
+				// UpdateOrder
+				{
+					int oldUpdateOrder = Entity.UpdateOrder;
+					int updateOrder = oldUpdateOrder;
+					if (ImGui.InputInt("Update Order", ref updateOrder) && updateOrder != oldUpdateOrder)
+					{
+						EditorChangeTracker.PushUndo(
+							new GenericValueChangeAction(
+								Entity,
+								typeof(Entity).GetProperty(nameof(Entity.UpdateOrder)),
+								oldUpdateOrder,
+								updateOrder,
+								$"{Entity.Name}.UpdateOrder"
+							),
+							Entity,
+							$"{Entity.Name}.UpdateOrder"
+						);
+						Entity.SetUpdateOrder(updateOrder);
+					}
+				}
 
-				var debugEnabled = Entity.DebugRenderEnabled;
-				if (ImGui.Checkbox("Debug Render Enabled", ref debugEnabled))
-					Entity.DebugRenderEnabled = debugEnabled;
+				// UpdateInterval
+				{
+					int updateInterval = (int)Entity.UpdateInterval;
+
+					// Draw the slider first
+					bool changed = ImGui.SliderInt("Update Interval", ref updateInterval, 1, 100);
+
+					// Start of edit session: store the initial value
+					if (ImGui.IsItemActive() && !_isEditingUpdateInterval)
+					{
+						_isEditingUpdateInterval = true;
+						_updateIntervalEditStartValue = Entity.UpdateInterval;
+					}
+
+					// Apply the value while dragging
+					if (changed)
+						Entity.UpdateInterval = (uint)updateInterval;
+
+					// End of edit session: push undo if value changed
+					if (_isEditingUpdateInterval && ImGui.IsItemDeactivatedAfterEdit())
+					{
+						_isEditingUpdateInterval = false;
+						if (Entity.UpdateInterval != _updateIntervalEditStartValue)
+						{
+							EditorChangeTracker.PushUndo(
+								new GenericValueChangeAction(
+									Entity,
+									(obj, val) => ((Entity)obj).UpdateInterval = (uint)val,
+									_updateIntervalEditStartValue,
+									Entity.UpdateInterval,
+									$"{Entity.Name}.UpdateInterval"
+								),
+								Entity,
+								$"{Entity.Name}.UpdateInterval"
+							);
+						}
+					}
+				}
+
+				// Tag
+				{
+					int oldTag = Entity.Tag;
+					int tag = oldTag;
+					if (ImGui.InputInt("Tag", ref tag) && tag != oldTag)
+					{
+						EditorChangeTracker.PushUndo(
+							new GenericValueChangeAction(
+								Entity,
+								typeof(Entity).GetProperty(nameof(Entity.Tag)),
+								oldTag,
+								tag,
+								$"{Entity.Name}.Tag"
+							),
+							Entity,
+							$"{Entity.Name}.Tag"
+						);
+						Entity.Tag = tag;
+					}
+				}
+
+				// DebugRenderEnabled
+				{
+					bool oldDebugEnabled = Entity.DebugRenderEnabled;
+					bool debugEnabled = oldDebugEnabled;
+					if (ImGui.Checkbox("Debug Render Enabled", ref debugEnabled) && debugEnabled != oldDebugEnabled)
+					{
+						EditorChangeTracker.PushUndo(
+							new GenericValueChangeAction(
+								Entity,
+								typeof(Entity).GetProperty(nameof(Entity.DebugRenderEnabled)),
+								oldDebugEnabled,
+								debugEnabled,
+								$"{Entity.Name}.DebugRenderEnabled"
+							),
+							Entity,
+							$"{Entity.Name}.DebugRenderEnabled"
+						);
+						Entity.DebugRenderEnabled = debugEnabled;
+					}
+				}
 
 				NezImGui.MediumVerticalSpace();
 				_transformInspector.Draw();

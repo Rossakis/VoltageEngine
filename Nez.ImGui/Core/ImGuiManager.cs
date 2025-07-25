@@ -102,9 +102,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		// Create default Main Entity Inspector window when current scene is finished loading the entities
 		Scene.OnFinishedAddingEntitiesWithData += OpenMainEntityInspector;
 
-		Core.EmitterWithPending.AddObserver(CoreEvents.Exiting, OnAppExiting);
-		//TODO: Uncomment when Core.EmitterWithPending is implemented
-		//Core.EmitterWithPending.AddObserver(CoreEvents.SceneChanged, (bool _pendingExit) => {});
+		Core.EmitterWithPending.AddObserver(CoreEvents.Exiting, OnAppExitSaveChanges);
 	}
 
 	/// <summary>
@@ -533,7 +531,8 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		    SceneGraphWindow.EntityPane.SelectedEntity = null;
 	}
 
-	private void OnAppExiting(bool pending)
+	#region Save Changes for App Exit and Scene Change
+	private void OnAppExitSaveChanges(bool pending)
 	{
 	    if (pending)
 	    {
@@ -569,4 +568,5 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	    var scene = (Scene)Activator.CreateInstance(sceneType);
 	    Core.StartSceneTransition(new FadeTransition(() => scene));
 	}
+	#endregion
 }

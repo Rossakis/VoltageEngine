@@ -8,17 +8,7 @@ namespace Nez.ImGuiTools;
 /// </summary>
 public class EditorChangeTracker
 {
-	/// <summary>
-	/// Event invoked when Ctrl+Z (Undo) is pressed in ImGui.
-	/// </summary>
-	public static event System.Action OnUndoPressed;
-
-	public static void UndoPressed()
-	{
-		OnUndoPressed?.Invoke();
-	}
-
-	// --- Dirty State Tracking ---
+	// Dirty State Tracking
 	public static bool IsDirty => _changedObjects.Count > 0;
 
     private static readonly List<(object obj, string description)> _changedObjects = new();
@@ -47,7 +37,16 @@ public class EditorChangeTracker
         _redoStack.Clear();
     }
 
-	// --- Undo/Redo Tracking ---
+    /// <summary>
+    /// Clear the Redo stack and reset the IsDirty flag on Scene Save (Undo stack is untouched).
+    /// </summary>
+    public static void ClearOnSave()
+    {
+	    _changedObjects.Clear();
+	    _redoStack.Clear();
+    }
+
+	// Undo/Redo Tracking
 
 	/// <summary>
 	/// Represents an undoable/redoable action.
