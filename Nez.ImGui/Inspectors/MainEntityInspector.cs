@@ -28,6 +28,9 @@ public class MainEntityInspector
 	private bool _isEditingUpdateInterval = false;
 	private uint _updateIntervalEditStartValue;
 
+	private bool _isEditingName = false;
+	private string _nameEditStartValue;
+
 	public MainEntityInspector(Entity entity = null)
 	{
 		Entity = entity;
@@ -121,26 +124,40 @@ public class MainEntityInspector
 					}
 				}
 
-				// Name
+				// Name (edit session)
 				{
-					string oldName = Entity.Name;
-					string name = oldName;
-					if (ImGui.InputText("Name", ref name, 25) && name != oldName)
+					string name = Entity.Name;
+					bool changed = ImGui.InputText("Name", ref name, 25);
+
+					if (ImGui.IsItemActive() && !_isEditingName)
 					{
-						EditorChangeTracker.PushUndo(
-							new GenericValueChangeAction(
-								Entity,
-								typeof(Entity).GetProperty(nameof(Entity.Name)),
-								oldName,
-								name,
-								$"{Entity.Name}.Name"
-							),
-							Entity,
-							$"{Entity.Name}.Name"
-						);
+						_isEditingName = true;
+						_nameEditStartValue = Entity.Name;
+					}
+
+					if (changed)
 						Entity.Name = name;
+
+					if (_isEditingName && ImGui.IsItemDeactivatedAfterEdit())
+					{
+						_isEditingName = false;
+						if (Entity.Name != _nameEditStartValue)
+						{
+							EditorChangeTracker.PushUndo(
+								new GenericValueChangeAction(
+									Entity,
+									typeof(Entity).GetProperty(nameof(Entity.Name)),
+									_nameEditStartValue,
+									Entity.Name,
+									$"{_nameEditStartValue}.Name"
+								),
+								Entity,
+								$"{_nameEditStartValue}.Name"
+							);
+						}
 					}
 				}
+
 
 				// UpdateOrder
 				{
