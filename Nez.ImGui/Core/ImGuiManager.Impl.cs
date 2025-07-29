@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -341,11 +342,14 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		// the Input, essentially letting ImGui consume it
 		_renderer.BeforeLayout(Time.DeltaTime);
 
+		// Exit prompt drawing and management
 		DrawApplicationExitPrompt(ref _pendingExit, ExitPromptType.Exit);
 		DrawApplicationExitPrompt(ref _pendingSceneChange, ExitPromptType.SceneChange);
 		DrawApplicationExitPrompt(ref _pendingResetScene, ExitPromptType.ResetScene);
-		ManageUndoAndRedo();
+		ManageApplicationExitPrompt();
 
+		ManageUndoAndRedo();
+		
 		LayoutGui();
 	}
 
@@ -386,24 +390,9 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 
 			if (ImGui.Button("Save", new Num.Vector2(120, 0)))
 			{
-				SceneGraphWindow.InvokeSaveSceneChanges();
-				EditorChangeTracker.Clear();
+				_pendingActionAfterSave = exitPromptType;
+				_pendingSaveTask = SaveSceneAsyncAndThenAct();
 				ImGui.CloseCurrentPopup();
-				if (exitPromptType == ExitPromptType.SceneChange && _requestedSceneType != null)
-				{
-					ChangeScene(_requestedSceneType);
-					pendingValue = false;
-				}
-				else if (exitPromptType == ExitPromptType.ResetScene)
-				{
-					ResetScene();
-					pendingValue = false;
-				}
-				else
-				{
-					pendingValue = false;
-					Core.ConfirmAndExit();
-				}
 			}
 
 			ImGui.SameLine();
@@ -443,6 +432,32 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		}
 			
 	}
+
+	private void ManageApplicationExitPrompt()
+	{
+		if (_pendingSaveTask != null && _pendingSaveTask.IsCompleted)
+		{
+			switch (_pendingActionAfterSave)
+			{
+				case ExitPromptType.SceneChange:
+					ChangeScene(_requestedSceneType);
+					_pendingSceneChange = false;
+					_requestedSceneType = null;
+					break;
+				case ExitPromptType.ResetScene:
+					ResetScene();
+					_pendingResetScene = false;
+					_requestedResetSceneType = null;
+					break;
+				case ExitPromptType.Exit:
+					Core.ConfirmAndExit();
+					_pendingExit = false;
+					break;
+			}
+			_pendingSaveTask = null;
+		}
+	}
+
 
 	private void ManageUndoAndRedo()
 	{

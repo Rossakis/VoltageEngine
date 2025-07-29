@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -8,6 +5,10 @@ using Microsoft.Xna.Framework.Input;
 using Nez.Editor;
 using Nez.Sprites;
 using Nez.Utils;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Num = System.Numerics;
 
 
@@ -72,6 +73,35 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	private Type _requestedSceneType = null;
 	private bool _pendingResetScene = false;
 	private Type _requestedResetSceneType = null;
+	private Task _pendingSaveTask = null;
+	private ExitPromptType _pendingActionAfterSave;
+
+	#region Event Handlers
+
+	/// <summary>
+	/// Can be used to wait for the scene changes to happen first.
+	/// </summary>
+	public event Func<Task> OnSaveSceneAsync;
+	public event Action OnResetScene;
+	public event Action<bool> OnSwitchEditMode;
+
+
+	public void InvokeSaveSceneChanges()
+	{
+		OnSaveSceneAsync?.Invoke();
+	}
+
+	public void InvokeResetScene()
+	{
+		OnResetScene?.Invoke();
+	}
+
+	public void InvokeSwitchEditMode(bool isEditMode)
+	{
+		OnSwitchEditMode?.Invoke(isEditMode);
+	}
+
+	#endregion
 
 	public ImGuiManager(ImGuiOptions options = null)
 	{
@@ -104,7 +134,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 
 		// Create default Main Entity Inspector window when current scene is finished loading the entities
 		Scene.OnFinishedAddingEntitiesWithData += OpenMainEntityInspector;
-		SceneGraphWindow.OnResetScene += RequestResetScene;
+		OnResetScene += RequestResetScene;
 		Core.EmitterWithPending.AddObserver(CoreEvents.Exiting, OnAppExitSaveChanges);
 	}
 
@@ -258,7 +288,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	private void UpdateCamera()
 	{
 		if (Input.IsKeyPressed(Keys.F1) || Input.IsKeyPressed(Keys.F2))
-			SceneGraphWindow.InvokeSwitchEditMode(Core.IsEditMode = !Core.IsEditMode);
+			InvokeSwitchEditMode(Core.IsEditMode = !Core.IsEditMode);
 
 		ManageCameraZoom();
 
@@ -592,6 +622,12 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		var newScene = (Scene)Activator.CreateInstance(_requestedResetSceneType ?? Core.Scene.GetType());
 		Core.Scene = newScene;
 		EditorChangeTracker.Clear();
+	}
+
+	private async Task SaveSceneAsyncAndThenAct()
+	{
+		if (OnSaveSceneAsync != null)
+			await OnSaveSceneAsync();
 	}
 	#endregion
 }

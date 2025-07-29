@@ -1,11 +1,12 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
 using ImGuiNET;
 using Microsoft.Xna.Framework.Input;
 using Nez.ECS;
 using Nez.ImGuiTools.SceneGraphPanes;
 using Nez.Utils;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Threading.Tasks;
 using Num = System.Numerics;
 
 namespace Nez.ImGuiTools;
@@ -43,29 +44,6 @@ public class SceneGraphWindow
 	private bool _showTmxFilePicker = false;
 	private string _selectedTmxFile = null;
 	public static event Action<string> OnTmxFileSelected;
-
-	#region Event Handlers
-
-	public event Action OnSaveSceneChanges;
-	public event Action OnResetScene;
-	public event Action<bool> OnSwitchEditMode;
-
-	public void InvokeSaveSceneChanges()
-	{
-		OnSaveSceneChanges?.Invoke();
-	}
-
-	public void InvokeResetScene()
-	{
-		OnResetScene?.Invoke();
-	}
-
-	public void InvokeSwitchEditMode(bool isEditMode)
-	{
-		OnSwitchEditMode?.Invoke(isEditMode);
-	}
-
-	#endregion
 
 	public void OnSceneChanged()
 	{
@@ -113,11 +91,11 @@ public class SceneGraphWindow
 				NezImGui.SmallVerticalSpace();
 
 				if (NezImGui.CenteredButton("Edit Mode", 0.8f))
-					InvokeSwitchEditMode(Nez.Core.IsEditMode = false);
+					_imGuiManager.InvokeSwitchEditMode(Nez.Core.IsEditMode = false);
 
 				NezImGui.SmallVerticalSpace();
 				if (NezImGui.CenteredButton("Reset Scene", 0.8f))
-					InvokeResetScene();
+					_imGuiManager.InvokeResetScene();
 			}
 			else
 			{
@@ -125,7 +103,7 @@ public class SceneGraphWindow
 				NezImGui.SmallVerticalSpace();
 
 				if (NezImGui.CenteredButton("Play Mode", 0.8f))
-					InvokeSwitchEditMode(Nez.Core.IsEditMode = true);
+					_imGuiManager.InvokeSwitchEditMode(Nez.Core.IsEditMode = true);
 			}
 
 			NezImGui.MediumVerticalSpace();
@@ -140,7 +118,7 @@ public class SceneGraphWindow
 
 			NezImGui.MediumVerticalSpace();
 			if (NezImGui.CenteredButton("Save Scene", 0.7f))
-				InvokeSaveSceneChanges();
+				_imGuiManager.InvokeSaveSceneChanges();
 
 			NezImGui.MediumVerticalSpace();
 			if (NezImGui.CenteredButton("Add Entity", 0.6f))
@@ -182,7 +160,7 @@ public class SceneGraphWindow
 		}
 
 		if (Input.IsKeyDown(Keys.LeftControl) && Input.IsKeyPressed(Keys.S))
-			InvokeSaveSceneChanges();
+			_imGuiManager.InvokeSaveSceneChanges();
 
 		HandleEntitySelectionNavigation();
 	}
