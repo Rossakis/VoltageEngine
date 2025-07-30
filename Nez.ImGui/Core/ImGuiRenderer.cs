@@ -180,32 +180,40 @@ namespace Nez.ImGuiTools
 			var io = ImGui.GetIO();
 
 #if FNA
-			// forward clipboard methods to SDL
-			io.SetClipboardTextFn = Marshal.GetFunctionPointerForDelegate<SetClipboardTextDelegate>(SetClipboardText);
-			io.GetClipboardTextFn = Marshal.GetFunctionPointerForDelegate<GetClipboardTextDelegate>(SDL2.SDL.SDL_GetClipboardText);
+    // forward clipboard methods to SDL
+    io.SetClipboardTextFn = Marshal.GetFunctionPointerForDelegate<SetClipboardTextDelegate>(SetClipboardText);
+    io.GetClipboardTextFn =
+ Marshal.GetFunctionPointerForDelegate<GetClipboardTextDelegate>(SDL2.SDL.SDL_GetClipboardText);
 #endif
 
-			_keys.Add(io.KeyMap[(int)ImGuiKey.Tab] = (int)Keys.Tab);
-			_keys.Add(io.KeyMap[(int)ImGuiKey.LeftArrow] = (int)Keys.Left);
-			_keys.Add(io.KeyMap[(int)ImGuiKey.RightArrow] = (int)Keys.Right);
-			_keys.Add(io.KeyMap[(int)ImGuiKey.UpArrow] = (int)Keys.Up);
-			_keys.Add(io.KeyMap[(int)ImGuiKey.DownArrow] = (int)Keys.Down);
-			_keys.Add(io.KeyMap[(int)ImGuiKey.PageUp] = (int)Keys.PageUp);
-			_keys.Add(io.KeyMap[(int)ImGuiKey.PageDown] = (int)Keys.PageDown);
-			_keys.Add(io.KeyMap[(int)ImGuiKey.Home] = (int)Keys.Home);
-			_keys.Add(io.KeyMap[(int)ImGuiKey.End] = (int)Keys.End);
-			_keys.Add(io.KeyMap[(int)ImGuiKey.Delete] = (int)Keys.Delete);
-			_keys.Add(io.KeyMap[(int)ImGuiKey.Backspace] = (int)Keys.Back);
-			_keys.Add(io.KeyMap[(int)ImGuiKey.Enter] = (int)Keys.Enter);
-			_keys.Add(io.KeyMap[(int)ImGuiKey.Escape] = (int)Keys.Escape);
-			_keys.Add(io.KeyMap[(int)ImGuiKey.LeftCtrl] = (int)Keys.LeftControl);
-			_keys.Add(io.KeyMap[(int)ImGuiKey.A] = (int)Keys.A);
-			_keys.Add(io.KeyMap[(int)ImGuiKey.C] = (int)Keys.C);
-			_keys.Add(io.KeyMap[(int)ImGuiKey.V] = (int)Keys.V);
-			_keys.Add(io.KeyMap[(int)ImGuiKey.X] = (int)Keys.X);
-			_keys.Add(io.KeyMap[(int)ImGuiKey.Y] = (int)Keys.Y);
-			_keys.Add(io.KeyMap[(int)ImGuiKey.Z] = (int)Keys.Z);
+			_keys.Clear();
 
+			// Map all XNA Keys to ImGui keys (legacy KeyMap for compatibility)
+			foreach (ImGuiKey imguiKey in Enum.GetValues(typeof(ImGuiKey)))
+			{
+				// Try to find a matching XNA Key
+				if (Enum.TryParse(typeof(Keys), imguiKey.ToString(), out var xnaKeyObj))
+				{
+					var xnaKey = (Keys)xnaKeyObj;
+					int imguiKeyIndex = (int)imguiKey;
+					int xnaKeyIndex = (int)xnaKey;
+
+					if (imguiKeyIndex >= 0 && imguiKeyIndex < io.KeyMap.Count)
+					{
+						io.KeyMap[imguiKeyIndex] = xnaKeyIndex;
+						if (!_keys.Contains(xnaKeyIndex))
+							_keys.Add(xnaKeyIndex);
+					}
+				}
+			}
+
+			// Add all XNA keys to _keys for full coverage (for UpdateInput)
+			foreach (Keys key in Enum.GetValues(typeof(Keys)))
+			{
+				int keyIndex = (int)key;
+				if (!_keys.Contains(keyIndex))
+					_keys.Add(keyIndex);
+			}
 
 #if !FNA
 			Core.Instance.Window.TextInput += (s, a) =>
@@ -216,12 +224,12 @@ namespace Nez.ImGuiTools
 				io.AddInputCharacter(a.Character);
 			};
 #else
-			TextInputEXT.TextInput += c =>
-			{
-				if (c == '\t')
-					return;
-				ImGui.GetIO().AddInputCharacter(c);
-			};
+    TextInputEXT.TextInput += c =>
+    {
+        if (c == '\t')
+            return;
+        ImGui.GetIO().AddInputCharacter(c);
+    };
 #endif
 		}
 

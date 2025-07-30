@@ -177,21 +177,19 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		}
 
 		UpdateCamera();
+		GlobalKeyCommands();
 	}
 
 	public void GlobalKeyCommands()
 	{
-		if (ImGui.IsKeyPressed(ImGuiKey.F1) || Input.IsKeyPressed(Keys.F2))
+		if (ImGui.IsKeyPressed(ImGuiKey.F1) || ImGui.IsKeyPressed(ImGuiKey.F2))
 			InvokeSwitchEditMode(Core.IsEditMode = !Core.IsEditMode);
 
 		// Save scene changes if Ctrl+S is pressed
-		if (Input.IsKeyDown(Keys.LeftControl) && Input.IsKeyPressed(Keys.S))
+		if (ImGui.GetIO().KeyCtrl && ImGui.IsKeyReleased(ImGuiKey.S))
 		{
-			System.Console.WriteLine("Pressed Save at: " );
 			InvokeSaveSceneChanges();
 		}
-
-		SceneGraphWindow.EntityPane.HandleCopyAndPaste();
 	}
 
 	/// <summary>

@@ -74,7 +74,8 @@ public class EntityPane
 
         // Draw gizmo for selected entity (arrows)
         DrawSelectedEntityGizmo();
-    }
+        HandleCopyAndPaste();
+	}
 	#endregion
 
 
@@ -390,15 +391,33 @@ public class EntityPane
 	/// <summary>
 	/// Handles copy/paste/duplicate shortcuts for entities.
 	/// </summary>
-	public void HandleCopyAndPaste()
+	private void HandleCopyAndPaste()
     {
 	    // Handle Copy/Paste/Duplicate Shortcuts
 	    bool gameCtrlDown = Input.IsKeyDown(Keys.LeftControl) || Input.IsKeyDown(Keys.RightControl);
+	    bool imguiCtrlDown = ImGui.GetIO().KeyCtrl;
+
+		// Ctrl+D: Duplicate selected
+		if (Core.IsEditMode && gameCtrlDown && Input.IsKeyPressed(Keys.D) && _selectedEntity != null)
+	    {
+		    System.Console.WriteLine("Duplicate game");
+		    DuplicateEntity(_selectedEntity);
+	    }
+	    else if (imguiCtrlDown && ImGui.IsKeyPressed(ImGuiKey.D) && _selectedEntity != null)
+	    {
+		    System.Console.WriteLine("Duplicate imgui");
+		    DuplicateEntity(_selectedEntity);
+	    }
 
 		// Ctrl+C: Copy (we can only copy in EditMode in game view)
 		if (Core.IsEditMode && gameCtrlDown && Input.IsKeyPressed(Keys.C) && _copiedEntity != _selectedEntity)
 	    {
 		    System.Console.WriteLine("Copy game");
+		    _copiedEntity = _selectedEntity;
+	    }
+	    else if (imguiCtrlDown && ImGui.IsKeyPressed(ImGuiKey.C) && _copiedEntity != _selectedEntity)
+	    {
+		    System.Console.WriteLine("Copy imgui");
 		    _copiedEntity = _selectedEntity;
 	    }
 
@@ -408,14 +427,12 @@ public class EntityPane
 		    System.Console.WriteLine("Paste game");
 		    DuplicateEntity(_copiedEntity);
 	    }
-
-	    // Ctrl+D: Duplicate selected
-	    if (Core.IsEditMode && gameCtrlDown && Input.IsKeyPressed(Keys.D) && _selectedEntity != null)
+	    else if (imguiCtrlDown && ImGui.IsKeyPressed(ImGuiKey.V) && _copiedEntity != null)
 	    {
-		    System.Console.WriteLine("Duplicate game");
-		    DuplicateEntity(_selectedEntity);
+		    System.Console.WriteLine("Paste imgui");
+		    DuplicateEntity(_copiedEntity);
 	    }
-	}
+    }
 
 	/// <summary>
 	/// Duplicates the given entity and adds it to the scene.
