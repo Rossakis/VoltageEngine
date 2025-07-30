@@ -10,6 +10,9 @@ namespace Nez.Data
 		[HideAttributeInInspector]
 		public List<ComponentDataEntry> ComponentDataList;
 
+		[InspectableAttribute]
+		public int NumberOfSerializedComponents => ComponentDataList.Capacity;
+
 		public EntityData()
 		{
 			ComponentDataList = new List<ComponentDataEntry>();

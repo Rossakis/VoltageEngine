@@ -180,15 +180,22 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		GlobalKeyCommands();
 	}
 
+	private bool isSavePressed;
 	public void GlobalKeyCommands()
 	{
 		if (ImGui.IsKeyPressed(ImGuiKey.F1) || ImGui.IsKeyPressed(ImGuiKey.F2))
 			InvokeSwitchEditMode(Core.IsEditMode = !Core.IsEditMode);
 
 		// Save scene changes if Ctrl+S is pressed
-		if (ImGui.GetIO().KeyCtrl && ImGui.IsKeyReleased(ImGuiKey.S))
+		if (ImGui.GetIO().KeyCtrl && ImGui.IsKeyPressed(ImGuiKey.S) && !isSavePressed)
 		{
+			isSavePressed = true;
 			InvokeSaveSceneChanges();
+		}
+
+		if(ImGui.IsKeyReleased(ImGuiKey.S) && isSavePressed)
+		{
+			isSavePressed = false;
 		}
 
 		// Handle Alt+F4 (regardless of window focus)

@@ -1,3 +1,4 @@
+using Nez.Data;
 using System;
 using System.Collections.Generic;
 
@@ -10,10 +11,16 @@ public static class EntityFactoryRegistry
 {
 	private static readonly Dictionary<string, Func<Entity>> _factories = new();
 	public static event Action<Entity> OnEntityCreated;
+	public static event Action<Entity, SceneData.SceneEntityData> OnDataLoadingStarted;
 
 	public static void InvokeEntityCreated(Entity entity)
 	{
 		OnEntityCreated?.Invoke(entity);
+	}
+
+	public static void InvokeDataLoadedStarted(Entity newEntity, SceneData.SceneEntityData entityData)
+	{
+		OnDataLoadingStarted?.Invoke(newEntity, entityData);
 	}
 
 	/// <summary>

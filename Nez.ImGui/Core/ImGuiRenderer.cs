@@ -207,12 +207,20 @@ namespace Nez.ImGuiTools
 				}
 			}
 
+			// Add ImGui keys that do not have a direct XNA mapping
+			_keys.Add(io.KeyMap[(int)ImGuiKey.LeftArrow] = (int)Keys.Left);
+			_keys.Add(io.KeyMap[(int)ImGuiKey.RightArrow] = (int)Keys.Right);
+			_keys.Add(io.KeyMap[(int)ImGuiKey.UpArrow] = (int)Keys.Up);
+			_keys.Add(io.KeyMap[(int)ImGuiKey.DownArrow] = (int)Keys.Down);
+
 			// Add all XNA keys to _keys for full coverage (for UpdateInput)
 			foreach (Keys key in Enum.GetValues(typeof(Keys)))
 			{
 				int keyIndex = (int)key;
 				if (!_keys.Contains(keyIndex))
+				{
 					_keys.Add(keyIndex);
+				}
 			}
 
 #if !FNA

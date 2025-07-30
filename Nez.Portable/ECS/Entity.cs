@@ -475,60 +475,71 @@ public class Entity : IComparable<Entity>
 	/// <returns>Scene.</returns>
 	/// <param name="component">Component.</param>
 	/// <typeparam name="T">The 1st type parameter.</typeparam>
-	public T AddComponent<T>(T component) where T : Component
+	public T AddComponent<T>(T component, bool allowSameComponentsOnEntity = false) where T : Component
 	{
-	    var type = component.GetType();
-	    var existingComponents = new List<T>();
-	    Components.GetComponents(existingComponents);
+		var type = component.GetType();
+		var existingComponents = new List<T>();
+		Components.GetComponents(existingComponents);
 
-	    int maxIndex = -1;
-	    foreach (var comp in existingComponents)
-	    {
-	        if (comp.GetType() == type)
-	        {
-	            if (!string.IsNullOrEmpty(comp.Name))
-	            {
-	                // Check for pattern: TypeName or TypeName_N
-	                if (comp.Name == type.Name)
-	                {
-	                    maxIndex = Math.Max(maxIndex, 0);
-	                }
-	                else if (comp.Name.StartsWith(type.Name + "_"))
-	                {
-	                    var suffix = comp.Name.Substring(type.Name.Length + 1);
-	                    if (int.TryParse(suffix, out int idx))
-	                        maxIndex = Math.Max(maxIndex, idx);
-	                }
-	            }
-	            else
-	            {
-	                maxIndex = Math.Max(maxIndex, 0);
-	            }
-	        }
-	    }
+		foreach (var comp in existingComponents)
+		{
+			// If not allowing multiple, return the first existing component of this type
+			if (!allowSameComponentsOnEntity && comp.GetType() == type)
+				return comp;
 
-	    string componentName = null;
+			// Prevent adding if a component of the same type and name already exists
+			if (comp.GetType() == type && comp.Name == component.Name)
+				return comp;
+		}
 
-	    // Assign unique name if needed
-	    if (maxIndex >= 0)
-	    {
-	        componentName = $"{type.Name}_{maxIndex + 1}";
-	    }
-	    else if (string.IsNullOrEmpty(component.Name))
-	    {
-	        componentName = type.Name;
-	    }
+		int maxIndex = -1;
+		foreach (var comp in existingComponents)
+		{
+			if (comp.GetType() == type)
+			{
+				if (!string.IsNullOrEmpty(comp.Name))
+				{
+					// Check for pattern: TypeName or TypeName_N
+					if (comp.Name == type.Name)
+					{
+						maxIndex = Math.Max(maxIndex, 0);
+					}
+					else if (comp.Name.StartsWith(type.Name + "_"))
+					{
+						var suffix = comp.Name.Substring(type.Name.Length + 1);
+						if (int.TryParse(suffix, out int idx))
+							maxIndex = Math.Max(maxIndex, idx);
+					}
+				}
+				else
+				{
+					maxIndex = Math.Max(maxIndex, 0);
+				}
+			}
+		}
 
-	    if (!string.IsNullOrEmpty(componentName))
-	        component.Name = componentName;
+		string componentName = null;
 
-	    component.Entity = this;
-	    Components.Add(component);
-	    component.Initialize();
+		// Assign unique name if needed
+		if (maxIndex >= 0)
+		{
+			componentName = $"{type.Name}_{maxIndex + 1}";
+		}
+		else if (string.IsNullOrEmpty(component.Name))
+		{
+			componentName = type.Name;
+		}
 
-	    TriggerComponentAddedCallbacks(component);
+		if (!string.IsNullOrEmpty(componentName))
+			component.Name = componentName;
 
-	    return component;
+		component.Entity = this;
+		Components.Add(component);
+		component.Initialize();
+
+		TriggerComponentAddedCallbacks(component);
+
+		return component;
 	}
 
 	/// <summary>

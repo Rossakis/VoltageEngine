@@ -176,18 +176,33 @@ public class SceneGraphWindow
 					if (ImGui.Selectable(typeName))
 					{
 						// Generate a unique name for the new entity
-						var uniqueName = Nez.Core.Scene.GetUniqueEntityName(typeName);
+						var uniqueName = Core.Scene.GetUniqueEntityName(typeName);
 
-						// Use the factory registry to create the entity
 						if (EntityFactoryRegistry.TryCreate(typeName, out var entity))
 						{
+							EntityFactoryRegistry.InvokeEntityCreated(entity);
 							entity.Type = Entity.InstanceType.Dynamic;
 							entity.Name = uniqueName;
-							entity.Transform.Position = Nez.Core.Scene.Camera.Transform.Position;
-							EntityFactoryRegistry.InvokeEntityCreated(entity);
-						}
+							entity.Transform.Position = Core.Scene.Camera.Transform.Position;
 
-						ImGui.CloseCurrentPopup();
+							// Undo/Redo support for entity creation
+							EditorChangeTracker.PushUndo(
+								new EntityCreateDeleteUndoAction(Core.Scene, entity, wasCreated: true,
+									$"Create Entity {entity.Name}"),
+								entity,
+								$"Create Entity {entity.Name}"
+							);
+
+							// Optionally select and open inspector
+							var imGuiManager = Core.GetGlobalManager<ImGuiManager>();
+							if (imGuiManager != null)
+							{
+								imGuiManager.SceneGraphWindow.EntityPane.SelectedEntity = entity;
+								imGuiManager.OpenMainEntityInspector(entity);
+							}
+
+							ImGui.CloseCurrentPopup();
+						}
 					}
 
 			ImGui.EndPopup();
@@ -198,7 +213,7 @@ public class SceneGraphWindow
 	#region Entity Selection Navigation
 	private void HandleEntitySelectionNavigation()
 	{
-		if (!Core.IsEditMode)
+		if (!Core.IsEditMode || EntityPane.SelectedEntity == null || !ImGui.IsWindowFocused(ImGuiFocusedFlags.AnyWindow))
 			return; 
 
 		var hierarchyList = BuildHierarchyList();
@@ -286,7 +301,7 @@ public class SceneGraphWindow
 	private List<Entity> BuildHierarchyList()
 	{
 		var result = new List<Entity>();
-		var entities = Nez.Core.Scene?.Entities;
+		var entities = Core.Scene?.Entities;
 		if (entities == null) return result;
 
 		for (int i = 0; i < entities.Count; i++)
@@ -321,7 +336,6 @@ public class SceneGraphWindow
 			return null; // Already at top
 
 		Entity prev = hierarchyList[idx - 1];
-
 
 		// If current is the first child of its parent, and prev is that parent, just select the parent
 		if (current.Transform.Parent != null && prev == current.Transform.Parent.Entity)

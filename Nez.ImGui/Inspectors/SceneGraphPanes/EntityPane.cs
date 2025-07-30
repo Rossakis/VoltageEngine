@@ -2,7 +2,9 @@ using System;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
+using Nez.Data;
 using Nez.ECS;
+using Nez.Editor;
 using Nez.Utils;
 
 namespace Nez.ImGuiTools.SceneGraphPanes;
@@ -74,7 +76,7 @@ public class EntityPane
 
         // Draw gizmo for selected entity (arrows)
         DrawSelectedEntityGizmo();
-        HandleCopyAndPaste();
+        EntityDuplicationAndDeletion();
 	}
 	#endregion
 
@@ -350,20 +352,13 @@ public class EntityPane
 	                _imGuiManager.SetCameraTargetPosition(entity.Transform.Position);
 
 			// Clone logic
-			var hasParameterlessCtor = entity.GetType().GetConstructor(Type.EmptyTypes) != null;
-            bool canClone = hasParameterlessCtor
-                            && !InspectorCache.HasNonParameterlessChildEntity(entity);
-
             string reason = null;
-            if (!canClone)
+            if (entity.Type == Entity.InstanceType.HardCoded)
             {
-				if (!hasParameterlessCtor)
-                    reason = "Can't duplicate a Non-parameterless Entity!";
-                else if (InspectorCache.HasNonParameterlessChildEntity(entity))
-                    reason = "Can't duplicate Entity with Non-parameterless children!";
-            }
+				reason = "Can't duplicate HardCoded entities!";
+			}
 
-            if (canClone)
+			if (reason == null)
             {
                 if (ImGui.Selectable("Duplicate Entity " + entity.Name))
 	                DuplicateEntity(entity);
@@ -376,7 +371,15 @@ public class EntityPane
             }
 
             if (ImGui.Selectable("Destroy Entity"))
+            {
+                // Push undo BEFORE destroying, so the entity is still valid
+                EditorChangeTracker.PushUndo(
+                    new EntityCreateDeleteUndoAction(entity.Scene, entity, wasCreated: false, $"Delete Entity {entity.Name}"),
+                    entity,
+                    $"Delete Entity {entity.Name}"
+                );
                 entity.Destroy();
+            }
 
             if (ImGui.Selectable("Create Child Entity", false, ImGuiSelectableFlags.DontClosePopups))
                 ImGui.OpenPopup("create-new-entity");
@@ -386,53 +389,79 @@ public class EntityPane
     }
 	#endregion
 
-	#region Copy and Paste Logic
 
+	#region Copy and Paste Logic
 	/// <summary>
 	/// Handles copy/paste/duplicate shortcuts for entities.
 	/// </summary>
-	private void HandleCopyAndPaste()
+	///
+	private void EntityDuplicationAndDeletion()
     {
 	    // Handle Copy/Paste/Duplicate Shortcuts
 	    bool gameCtrlDown = Input.IsKeyDown(Keys.LeftControl) || Input.IsKeyDown(Keys.RightControl);
 	    bool imguiCtrlDown = ImGui.GetIO().KeyCtrl;
 
-		// Ctrl+D: Duplicate selected
-		if (Core.IsEditMode && gameCtrlDown && Input.IsKeyPressed(Keys.D) && _selectedEntity != null)
+
+	    bool ShouldBlockDuplication(Entity entity)
 	    {
-		    System.Console.WriteLine("Duplicate game");
-		    DuplicateEntity(_selectedEntity);
+	        if (entity != null && entity.Type == Entity.InstanceType.HardCoded)
+	        {
+	            NotificationSystem.ShowNotification("Cannot duplicate HardCoded entities.");
+	            return true; 
+	        }
+	        return false;
+	    }
+
+	    // Ctrl+D: Duplicate selected
+	    if (Core.IsEditMode && gameCtrlDown && Input.IsKeyPressed(Keys.D) && _selectedEntity != null)
+	    {
+	        if (!ShouldBlockDuplication(_selectedEntity))
+	            DuplicateEntity(_selectedEntity);
 	    }
 	    else if (imguiCtrlDown && ImGui.IsKeyPressed(ImGuiKey.D) && _selectedEntity != null)
 	    {
-		    System.Console.WriteLine("Duplicate imgui");
-		    DuplicateEntity(_selectedEntity);
+	        if (!ShouldBlockDuplication(_selectedEntity))
+	            DuplicateEntity(_selectedEntity);
 	    }
 
-		// Ctrl+C: Copy (we can only copy in EditMode in game view)
-		if (Core.IsEditMode && gameCtrlDown && Input.IsKeyPressed(Keys.C) && _copiedEntity != _selectedEntity)
+	    // Ctrl+C: Copy (we can only copy in EditMode in game view)
+	    if (Core.IsEditMode && gameCtrlDown && Input.IsKeyPressed(Keys.C) && _copiedEntity != _selectedEntity)
 	    {
-		    System.Console.WriteLine("Copy game");
-		    _copiedEntity = _selectedEntity;
+	        if (!ShouldBlockDuplication(_selectedEntity))
+	            _copiedEntity = _selectedEntity;
 	    }
 	    else if (imguiCtrlDown && ImGui.IsKeyPressed(ImGuiKey.C) && _copiedEntity != _selectedEntity)
 	    {
-		    System.Console.WriteLine("Copy imgui");
-		    _copiedEntity = _selectedEntity;
+	        if (!ShouldBlockDuplication(_selectedEntity))
+	            _copiedEntity = _selectedEntity;
 	    }
 
 	    // Ctrl+V: Paste (duplicate)
 	    if (Core.IsEditMode && gameCtrlDown && Input.IsKeyPressed(Keys.V) && _copiedEntity != null)
 	    {
-		    System.Console.WriteLine("Paste game");
-		    DuplicateEntity(_copiedEntity);
+	        if (!ShouldBlockDuplication(_selectedEntity))
+	            DuplicateEntity(_copiedEntity);
 	    }
 	    else if (imguiCtrlDown && ImGui.IsKeyPressed(ImGuiKey.V) && _copiedEntity != null)
 	    {
-		    System.Console.WriteLine("Paste imgui");
-		    DuplicateEntity(_copiedEntity);
+	        if (!ShouldBlockDuplication(_selectedEntity))
+	            DuplicateEntity(_copiedEntity);
 	    }
-    }
+
+	    // Delete: Remove selected entity with Undo/Redo support
+	    if (Core.IsEditMode && _selectedEntity != null &&
+	        (Input.IsKeyPressed(Keys.Delete) || ImGui.IsKeyPressed(ImGuiKey.Delete)))
+	    {
+	        // Push undo BEFORE destroying, so the entity is still valid
+	        EditorChangeTracker.PushUndo(
+	            new EntityCreateDeleteUndoAction(_selectedEntity.Scene, _selectedEntity, wasCreated: false, $"Deleted: {_selectedEntity.Name}"),
+	            _selectedEntity,
+	            $"Deleted: {_selectedEntity.Name}"
+	        );
+	        _selectedEntity.DetachFromScene();
+	        SelectedEntity = null;
+	    }
+	}
 
 	/// <summary>
 	/// Duplicates the given entity and adds it to the scene.
@@ -440,33 +469,40 @@ public class EntityPane
 	/// </summary>
 	private void DuplicateEntity(Entity entity)
     {
-		if (entity == null || entity.Scene == null)
-			return;
+	    if (entity == null || entity.Scene == null)
+		    return;
 
 		var typeName = entity.GetType().Name;
-		if (EntityFactoryRegistry.TryCreate(typeName, out var clone))
-		{
+	    if (EntityFactoryRegistry.TryCreate(typeName, out var clone))
+	    {
+			EntityFactoryRegistry.InvokeEntityCreated(clone);
 			clone.Type = Entity.InstanceType.Dynamic;
 			clone.Name = Core.Scene.GetUniqueEntityName(typeName);
-			clone.Transform.Position = Core.Scene.Camera.Position;
-			EntityFactoryRegistry.InvokeEntityCreated(clone);
-			entity.Scene.AddEntity(clone);
+			clone.Transform.Position = entity.Transform.Position;
+			clone.Transform.Rotation = entity.Rotation;
+			clone.Transform.Scale = entity.Scale;
+			clone.SetTag(entity.Tag);
+			clone.Enabled = entity.Enabled;
+			clone.UpdateOrder = entity.UpdateOrder;
+			clone.DebugRenderEnabled = entity.DebugRenderEnabled;
 
-			// Optionally select the new entity
-			SelectedEntity = clone;
-			_imGuiManager.OpenMainEntityInspector(clone);
-		}
-		else
-		{
-			// Fallback: use deep clone if factory is not available
-			var fallbackClone = entity.Clone(Core.Scene.Camera.Position);
-			fallbackClone.Type = Entity.InstanceType.Dynamic;
-			fallbackClone.Name = Core.Scene.GetUniqueEntityName(entity.Name);
-			entity.Scene.AddEntity(fallbackClone);
+			// Undo/Redo support for entity creation
+			EditorChangeTracker.PushUndo(
+                new EntityCreateDeleteUndoAction(entity.Scene, clone, wasCreated: true, $"Created: Entity {clone.Name}"),
+                clone,
+                $"Created: {clone.Name}"
+            );
 
-			SelectedEntity = fallbackClone;
-			_imGuiManager.OpenMainEntityInspector(fallbackClone);
-		}
+            // Optionally select the new entity
+            SelectedEntity = clone;
+            _imGuiManager.OpenMainEntityInspector(clone);
+	    }
+	    else
+	    {
+		    throw new InvalidOperationException(
+			    $"EntityFactoryRegistry: Entity type '{typeName}' is not registered in the factory. " +
+			    $"Did you forget to call EntityFactoryRegistry.Register(\"{typeName}\", ...)?");
+	    }
 	}
     #endregion
 
