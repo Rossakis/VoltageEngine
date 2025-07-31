@@ -432,4 +432,25 @@ public class SpriteAnimator : SpriteRenderer, IUpdatable
 
 		return (CurrentFrame + 1) / (float)CurrentAnimation.Sprites.Length;
 	}
+
+	// public override Component Clone()
+	// {
+	// 	var clone = (SpriteAnimator)base.Clone();
+	// 	if (Sprite != null)
+	// 		clone.Sprite = Sprite.Clone();
+	//
+	// 	// Deep copy animations dictionary if present
+	// 	if (Animations != null)
+	// 	{
+	// 		clone.Animations = new Dictionary<string, SpriteAnimation>();
+	// 		foreach (var kvp in Animations)
+	// 			clone.Animations[kvp.Key] = kvp.Value.Clone();
+	// 	}
+	//
+	// 	// Deep copy current animation if present
+	// 	if (CurrentAnimation != null)
+	// 		clone.CurrentAnimation = CurrentAnimation.Clone();
+	//
+	// 	return clone;
+	// }
 }

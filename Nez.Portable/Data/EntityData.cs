@@ -17,5 +17,10 @@ namespace Nez.Data
 		{
 			ComponentDataList = new List<ComponentDataEntry>();
 		}
+
+		public override Component Clone()
+		{
+			return base.Clone();
+		}
 	}
 }

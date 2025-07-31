@@ -198,7 +198,7 @@ public class SceneGraphWindow
 							if (imGuiManager != null)
 							{
 								imGuiManager.SceneGraphWindow.EntityPane.SelectedEntity = entity;
-								imGuiManager.OpenMainEntityInspector(entity);
+								_imGuiManager.MainEntityInspector.DelayedSetEntity(entity);
 							}
 
 							ImGui.CloseCurrentPopup();

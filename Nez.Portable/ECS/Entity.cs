@@ -1,11 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
-using System.Text.Json.Serialization;
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using Nez.Data;
 using Nez.Persistence;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Text.Json.Serialization;
 
 namespace Nez;
 
@@ -127,8 +127,9 @@ public class Entity : IComparable<Entity>
 
 	#region Serialization data structs
 	private readonly Dictionary<Type, List<Delegate>> _componentAddedCallbacks = new();
+	private readonly Dictionary<Type, List<Delegate>> _childAddedCallbacks = new();
 
-	public EntityData Data { get; set; }
+	public virtual EntityData Data { get; set; }
 
 	#endregion
 
@@ -385,50 +386,63 @@ public class Entity : IComparable<Entity>
 	}
 
 	/// <summary>
-	/// creates a deep clone of this Entity. Subclasses can override this method to copy any custom fields. When overriding,
-	/// the CopyFrom method should be called which will clone all Components, Colliders and Transform children for you. Note
-	/// that the cloned Entity will not be added to any Scene! You must add them yourself!
-	/// </summary>
-	public virtual Entity Clone(Vector2 position = default)
-	{
-		var entity = Activator.CreateInstance(GetType()) as Entity;
-		entity.Name = Name + "(clone)";
-		entity.CopyFrom(this);
-		entity.Transform.Position = position;
-		return entity;
-	}
-
-	/// <summary>
 	/// copies the properties, components and colliders of Entity to this instance
 	/// </summary>
 	/// <param name="entity">Entity.</param>
-	protected void CopyFrom(Entity entity)
+	public void CopyEntityFrom(Entity entity)
 	{
-		// Entity fields
-		Tag = entity.Tag;
+		// Copy basic fields
+		Type = InstanceType.Dynamic;
+		Name = Core.Scene.GetUniqueEntityName(entity.GetType().Name);
+		Transform.Position = entity.Transform.Position;
+		Transform.Rotation = entity.Rotation;
+		Transform.Scale = entity.Scale;
+		SetTag(entity.Tag);
+		Enabled = entity.Enabled;
+		DebugRenderEnabled = entity.DebugRenderEnabled;
 		UpdateInterval = entity.UpdateInterval;
 		UpdateOrder = entity.UpdateOrder;
 		Enabled = entity.Enabled;
 
-		Transform.Scale = entity.Transform.Scale;
-		Transform.Rotation = entity.Transform.Rotation;
+		// Track which components have been handled
+		var handled = new HashSet<Component>();
 
-		// clone Components
-		for (var i = 0; i < entity.Components.Count; i++)
-			AddComponent(entity.Components[i].Clone());
-		for (var i = 0; i < entity.Components._componentsToAdd.Count; i++)
-			AddComponent(entity.Components._componentsToAdd[i].Clone());
-
-		// clone any children of the Entity.transform
-		for (var i = 0; i < entity.Transform.ChildCount; i++)
+		// For each component in the source entity
+		foreach (var sourceComponent in entity.Components)
 		{
-			var child = entity.Transform.GetChild(i).Entity;
+			// Try to find a matching component in this entity (by type and name)
+			var targetComponent = Components.FirstOrDefault(c => c.GetType() == sourceComponent.GetType() && c.Name == sourceComponent.Name);
 
-			var childClone = child.Clone();
-			childClone.Transform.CopyFrom(child.Transform);
-			childClone.Transform.Parent = Transform;
+			if (targetComponent != null)
+			{
+				RemoveComponent(targetComponent);
+			}
+
+			var clone = sourceComponent.Clone();
+			AddComponent(clone);
+			handled.Add(clone);
 		}
 	}
+
+	/// <summary>
+	/// Find a component in this entity that has the same type and name as the source component, and then copies it
+	/// </summary>
+	/// <param name="entity"></param>
+	public void CopySameComponentFromEntity(Entity entity)
+	{
+		foreach (var sourceComponent in entity.Components)
+		{
+			// Try to find a matching component in this entity (by type and name)
+			var targetComponent = Components.FirstOrDefault(c => c.GetType() == sourceComponent.GetType() && c.Name == sourceComponent.Name);
+
+			if (targetComponent != null)
+				RemoveComponent(targetComponent);
+
+			var clone = sourceComponent.Clone();
+			AddComponent(clone);
+		}
+	}
+
 
 	#region Entity lifecycle methods
 
@@ -660,6 +674,65 @@ public class Entity : IComparable<Entity>
 		for (var i = 0; i < Components.Count; i++)
 			RemoveComponent(Components[i]);
 	}
+
+	/// <summary>
+	/// Removes a component from the entity that matches the type and name of the specified component,
+	/// then adds the specified component to the entity.
+	/// </summary>
+	public T ReplaceComponent<T>(T component) where T : Component
+	{
+		var existing = Components.FirstOrDefault(c => c.GetType() == component.GetType() && c.Name == component.Name);
+
+		if (existing != null)
+			RemoveComponent(existing);
+
+		return AddComponent(component);
+	}
+
+	#endregion
+
+	#region Child Event callbacks
+	// Add this method to Entity
+	/// <summary>
+	/// Registers a callback that will be invoked whenever a child entity of type <typeparamref name="T"/> is added to this entity.
+	/// </summary>
+	public void OnChildAdded<T>(Action<T> onAdded) where T : Entity
+	{
+		var type = typeof(T);
+		if (!_childAddedCallbacks.TryGetValue(type, out var list))
+		{
+			list = new List<Delegate>();
+			_childAddedCallbacks[type] = list;
+		}
+		list.Add(onAdded);
+	}
+
+	// Add this method to Entity
+	internal void TriggerChildAddedCallbacks(Entity child)
+	{
+		var type = child.GetType();
+		var delegatesToRemove = new List<(Type, Delegate)>();
+
+		foreach (var kvp in _childAddedCallbacks)
+		{
+			if (kvp.Key.IsAssignableFrom(type))
+			{
+				foreach (var del in kvp.Value.ToArray())
+				{
+					del.DynamicInvoke(child);
+
+					// Remove if this is a one-shot delegate (optional, if you want to support OnChildAddedOnce)
+					if (del.Target is IOneShotDelegate)
+						delegatesToRemove.Add((kvp.Key, del));
+				}
+			}
+		}
+
+		// Remove one-shot delegates after invoking
+		foreach (var (t, d) in delegatesToRemove)
+			_childAddedCallbacks[t].Remove(d);
+	}
+
 
 	#endregion
 

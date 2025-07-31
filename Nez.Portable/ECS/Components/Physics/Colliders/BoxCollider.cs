@@ -137,10 +137,10 @@ namespace Nez
 			batcher.DrawHollowRect(Bounds, Debug.Colors.ColliderBounds, Debug.Size.LineSizeMultiplier);
 			batcher.DrawPolygon(Shape.Position, poly.Points, Debug.Colors.ColliderEdge, true,
 				Debug.Size.LineSizeMultiplier);
-
+			
 			if(Entity == null)
 				return;
-
+			
 			batcher.DrawPixel(Entity.Transform.Position, Debug.Colors.ColliderPosition,
 				4 * Debug.Size.LineSizeMultiplier);
 			batcher.DrawPixel(Entity.Transform.Position + Shape.Center, Debug.Colors.ColliderCenter,

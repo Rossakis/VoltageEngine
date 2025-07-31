@@ -1,4 +1,3 @@
-using System;
 using ImGuiNET;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
@@ -6,6 +5,11 @@ using Nez.Data;
 using Nez.ECS;
 using Nez.Editor;
 using Nez.Utils;
+using System;
+using System.Collections;
+using System.Linq;
+using System.Reflection;
+using Nez.Utils.Coroutines;
 
 namespace Nez.ImGuiTools.SceneGraphPanes;
 
@@ -13,7 +17,7 @@ public class EntityPane
 {
 	#region Fields and Properties
 	public bool IsDraggingGizmo => _draggingX || _draggingY;
-	public static Collider _selectedEntityCollider; // Used for rendering a collider box for the currently selected entity
+	//public static Collider _selectedEntityCollider; // Used for rendering a collider box for the currently selected entity
 
     private const int MIN_ENTITIES_FOR_CLIPPER = 100;
 
@@ -26,7 +30,6 @@ public class EntityPane
         set
         {
             _selectedEntity = value;
-            _selectedEntityCollider = _selectedEntity?.GetComponent<Collider>();
         }
     }
 
@@ -291,7 +294,6 @@ public class EntityPane
                 if (_previousEntity == null || !_previousEntity.Equals(entity))
                 {
                     _previousEntity = entity;
-                    _selectedEntityCollider = entity.GetComponent<Collider>();
                 }
 
                 _imGuiManager.SetCameraTargetPosition(entity.Transform.Position);
@@ -475,16 +477,25 @@ public class EntityPane
 		var typeName = entity.GetType().Name;
 	    if (EntityFactoryRegistry.TryCreate(typeName, out var clone))
 	    {
+		    clone.OnComponentAdded<Component>(comp =>
+		    {
+			    // System.Console.WriteLine($"{comp.Name} was added to {clone.Name}");
+			    clone.CopyEntityFrom(entity);
+		    });
+
+			clone.OnChildAdded<Entity>(ent =>
+		    {
+			    for (var i = 0; i < clone.Transform.ChildCount; i++)
+			    {
+				    if (entity.Transform.GetChild(i).Entity.Name == ent.Name)
+				    {
+					    // System.Console.WriteLine($"{ent.Name} copied from {entity.Transform.GetChild(i).Entity.Name}");
+					    ent.CopyEntityFrom(entity.Transform.GetChild(i).Entity);
+				    }
+			    }
+		    });
+
 			EntityFactoryRegistry.InvokeEntityCreated(clone);
-			clone.Type = Entity.InstanceType.Dynamic;
-			clone.Name = Core.Scene.GetUniqueEntityName(typeName);
-			clone.Transform.Position = entity.Transform.Position;
-			clone.Transform.Rotation = entity.Rotation;
-			clone.Transform.Scale = entity.Scale;
-			clone.SetTag(entity.Tag);
-			clone.Enabled = entity.Enabled;
-			clone.UpdateOrder = entity.UpdateOrder;
-			clone.DebugRenderEnabled = entity.DebugRenderEnabled;
 
 			// Undo/Redo support for entity creation
 			EditorChangeTracker.PushUndo(
@@ -493,17 +504,78 @@ public class EntityPane
                 $"Created: {clone.Name}"
             );
 
-            // Optionally select the new entity
-            SelectedEntity = clone;
-            _imGuiManager.OpenMainEntityInspector(clone);
-	    }
-	    else
+			//Manually set the entity data to ensure it is cloned correctly
+			clone.RemoveComponent<EntityData>();
+			clone.AddComponent(entity.GetComponent<EntityData>()?.Clone() ?? new EntityData());
+
+			SelectedEntity = clone;
+            _imGuiManager.MainEntityInspector.DelayedSetEntity(clone);
+		}
+		else
 	    {
 		    throw new InvalidOperationException(
 			    $"EntityFactoryRegistry: Entity type '{typeName}' is not registered in the factory. " +
 			    $"Did you forget to call EntityFactoryRegistry.Register(\"{typeName}\", ...)?");
 	    }
+
 	}
-    #endregion
+
+	private IEnumerator MarkDelayed(Entity entity, float time)
+	{
+		yield return Coroutine.WaitForSeconds(time);
+		entity.AttachToScene(Core.Scene);
+	}
+
+	public void CopyComponentValues(Entity originalEntity, Component targetComponent)
+	{
+		if (targetComponent == null)
+			throw new ArgumentNullException(nameof(targetComponent));
+
+		// Find the matching component on this entity by type and name
+		var sourceComponent = originalEntity.Components.FirstOrDefault(c => c.GetType() == targetComponent.GetType() && c.Name == targetComponent.Name);
+
+		if (sourceComponent == null)
+			return;
+
+		var type = sourceComponent.GetType();
+
+		// Copy all public instance properties with both getter and setter
+		foreach (var prop in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+		{
+			if (!prop.CanRead || !prop.CanWrite)
+				continue;
+
+			if (!prop.GetSetMethod()!.IsPublic || !prop.GetGetMethod()!.IsPublic)
+				continue;
+
+			if (prop.GetIndexParameters().Length > 0) // Skip indexers
+				continue;
+
+			try
+			{
+				var value = prop.GetValue(sourceComponent);
+				prop.SetValue(targetComponent, value);
+			}
+			catch
+			{
+				// Ignore property if it fails to set
+			}
+		}
+
+		// Copy all public instance fields
+		foreach (var field in type.GetFields(BindingFlags.Public | BindingFlags.Instance))
+		{
+			try
+			{
+				var value = field.GetValue(sourceComponent);
+				field.SetValue(targetComponent, value);
+			}
+			catch
+			{
+				// Ignore field if it fails to set 
+			}
+		}
+	}
+	#endregion
 
 }

@@ -1,7 +1,9 @@
 using ImGuiNET;
 using Nez.ImGuiTools.ObjectInspectors;
 using Nez.Utils;
+using Nez.Utils.Coroutines;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -291,7 +293,23 @@ public class MainEntityInspector
 		ImGui.PopStyleColor();
 
 		if (!open)
-			Nez.Core.GetGlobalManager<ImGuiManager>().CloseMainEntityInspector();
+			Core.GetGlobalManager<ImGuiManager>().CloseMainEntityInspector();
+	}
+
+	/// <summary>
+	/// Used when we're dealing with a newly loaded entity that might not be ready to be set immediately.
+	/// </summary>
+	/// <param name="entity"></param>
+	/// <param name="time"></param>
+	public void DelayedSetEntity(Entity entity, float time = 0.05f)
+	{
+		Core.StartCoroutine(ShowInspector(entity, time));
+	}
+
+	private IEnumerator ShowInspector(Entity entity, float time)
+	{
+		yield return Coroutine.WaitForSeconds(time);
+		SetEntity(entity);
 	}
 
 	private void DrawComponentSelectorPopup()

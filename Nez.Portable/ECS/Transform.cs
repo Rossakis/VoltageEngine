@@ -308,7 +308,10 @@ public class Transform
 			_parent._children.Remove(this);
 
 		if (parent != null)
+		{
 			parent._children.Add(this);
+			parent.Entity.TriggerChildAddedCallbacks(Entity);
+		}
 
 		_parent = parent;
 		SetDirty(DirtyType.PositionDirty);
