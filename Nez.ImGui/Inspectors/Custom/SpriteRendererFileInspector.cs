@@ -99,8 +99,8 @@ namespace Nez.ImGuiTools.TypeInspectors
                 ImGui.Spacing();
             }
 
-            // File selection buttons
-            if (ImGui.Button("Load PNG/JPG"))
+            // File selection buttons - REMOVED JPG SUPPORT
+            if (ImGui.Button("Load PNG"))
             {
                 _errorMessage = "";
                 ImGui.OpenPopup("png-file-picker");
@@ -131,8 +131,8 @@ namespace Nez.ImGuiTools.TypeInspectors
                 }
             }
 
-            // File picker popups
-            DrawFilePickerPopup("png-file-picker", ".png|.jpg|.jpeg", (sr, path) => LoadPngFileFromPicker(sr, path));
+            // File picker popups - UPDATED TO PNG ONLY
+            DrawFilePickerPopup("png-file-picker", ".png", (sr, path) => LoadPngFileFromPicker(sr, path));
             DrawAsepriteFilePickerPopup(spriteRenderer);
             DrawTmxFilePickerPopup(spriteRenderer);
         }
@@ -148,7 +148,23 @@ namespace Nez.ImGuiTools.TypeInspectors
                 DrawFilePickerContent(picker);
 
                 ImGui.Separator();
-                DrawCustomButtons(picker, loadAction, "Open");
+                
+                // Handle the return value from DrawCustomButtons
+                if (DrawCustomButtons(picker, loadAction, "Open"))
+                {
+                    string contentRoot = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, "Content"));
+                    if (picker.SelectedFile.StartsWith(contentRoot, StringComparison.OrdinalIgnoreCase))
+                    {
+                        string relativePath = Path.GetRelativePath(Environment.CurrentDirectory, picker.SelectedFile).Replace('\\', '/');
+                        loadAction(GetSpriteRenderer(), relativePath);
+                        ImGui.CloseCurrentPopup();
+                        FilePicker.RemoveFilePicker(this);
+                    }
+                    else
+                    {
+                        _errorMessage = "File must be in Content folder!";
+                    }
+                }
 
                 ImGui.EndPopup();
             }
@@ -382,11 +398,6 @@ namespace Nez.ImGuiTools.TypeInspectors
                             bool isSelected = picker.SelectedFile == fse;
                             if (ImGui.Selectable(name, isSelected, ImGuiSelectableFlags.DontClosePopups))
                                 picker.SelectedFile = fse;
-
-                            // if (ImGui.IsMouseDoubleClicked(0))
-                            // {
-                            //     // Handle double-click if needed
-                            // }
                         }
                     }
                 }
@@ -475,7 +486,33 @@ namespace Nez.ImGuiTools.TypeInspectors
                 var contentManager = spriteRenderer.Entity?.Scene?.Content ?? Core.Content;
                 if (contentManager != null)
                 {
+                    // Store the old state for undo
+                    var oldSprite = spriteRenderer.Sprite;
+                    var oldData = spriteRenderer.Data != null ? 
+                        new SpriteRenderer.SpriteRendererComponentData(spriteRenderer) : 
+                        new SpriteRenderer.SpriteRendererComponentData();
+
+                    // Load the new PNG
                     spriteRenderer.LoadPngFile(relativePath, contentManager);
+                    
+                    // Store the new state
+                    var newSprite = spriteRenderer.Sprite;
+                    var newData = new SpriteRenderer.SpriteRendererComponentData(spriteRenderer);
+
+                    // Push undo action
+                    EditorChangeTracker.PushUndo(
+                        new SpriteLoadUndoAction(
+                            spriteRenderer,
+                            oldSprite,
+                            oldData,
+                            newSprite,
+                            newData,
+                            $"Load PNG: {relativePath}"
+                        ),
+                        spriteRenderer.Entity,
+                        $"Load PNG: {relativePath}"
+                    );
+
                     Debug.Log($"Loaded PNG from editor: {relativePath}");
                     _errorMessage = ""; // Clear error on success
                 }
@@ -498,7 +535,33 @@ namespace Nez.ImGuiTools.TypeInspectors
                 var contentManager = spriteRenderer.Entity?.Scene?.Content ?? Core.Content;
                 if (contentManager != null)
                 {
+                    // Store the old state for undo
+                    var oldSprite = spriteRenderer.Sprite;
+                    var oldData = spriteRenderer.Data != null ? 
+                        new SpriteRenderer.SpriteRendererComponentData(spriteRenderer) : 
+                        new SpriteRenderer.SpriteRendererComponentData();
+
+                    // Load the new Aseprite file
                     spriteRenderer.LoadAsepriteFile(relativePath, contentManager, layerName, frameNumber);
+                    
+                    // Store the new state
+                    var newSprite = spriteRenderer.Sprite;
+                    var newData = new SpriteRenderer.SpriteRendererComponentData(spriteRenderer);
+
+                    // Push undo action
+                    EditorChangeTracker.PushUndo(
+                        new SpriteLoadUndoAction(
+                            spriteRenderer,
+                            oldSprite,
+                            oldData,
+                            newSprite,
+                            newData,
+                            $"Load Aseprite: {relativePath} (frame {frameNumber}, layer: {layerName ?? "all"})"
+                        ),
+                        spriteRenderer.Entity,
+                        $"Load Aseprite: {relativePath}"
+                    );
+
                     Debug.Log($"Loaded Aseprite from editor: {relativePath} (frame {frameNumber}, layer: {layerName ?? "all"})");
                     _errorMessage = ""; // Clear error on success
                 }
@@ -521,7 +584,33 @@ namespace Nez.ImGuiTools.TypeInspectors
                 var contentManager = spriteRenderer.Entity?.Scene?.Content ?? Core.Content;
                 if (contentManager != null)
                 {
+                    // Store the old state for undo
+                    var oldSprite = spriteRenderer.Sprite;
+                    var oldData = spriteRenderer.Data != null ? 
+                        new SpriteRenderer.SpriteRendererComponentData(spriteRenderer) : 
+                        new SpriteRenderer.SpriteRendererComponentData();
+
+                    // Load the new TMX file
                     spriteRenderer.LoadTmxFile(relativePath, contentManager, imageLayerName);
+                    
+                    // Store the new state
+                    var newSprite = spriteRenderer.Sprite;
+                    var newData = new SpriteRenderer.SpriteRendererComponentData(spriteRenderer);
+
+                    // Push undo action
+                    EditorChangeTracker.PushUndo(
+                        new SpriteLoadUndoAction(
+                            spriteRenderer,
+                            oldSprite,
+                            oldData,
+                            newSprite,
+                            newData,
+                            $"Load TMX: {relativePath} (layer: {imageLayerName ?? "first"})"
+                        ),
+                        spriteRenderer.Entity,
+                        $"Load TMX: {relativePath}"
+                    );
+
                     Debug.Log($"Loaded TMX from editor: {relativePath} (layer: {imageLayerName ?? "first"})");
                     _errorMessage = ""; // Clear error on success
                 }
@@ -601,6 +690,11 @@ namespace Nez.ImGuiTools.TypeInspectors
 	        {
 		        AddImageLayersFromGroup(nestedGroup, imageLayerNames);
 	        }
+        }
+
+        private SpriteRenderer GetSpriteRenderer()
+        {
+	        return _target as SpriteRenderer;
         }
 	}
 }

@@ -94,7 +94,7 @@ namespace Nez.Sprites
 					var extension = Path.GetExtension(TextureFilePath).ToLower();
 					FileType = extension switch
 					{
-						".png" or ".jpg" or ".jpeg" => ImageFileType.Png,
+						".png" => ImageFileType.Png, 
 						".ase" or ".aseprite" => ImageFileType.Aseprite,
 						".tmx" => ImageFileType.Tiled,
 						_ => ImageFileType.None
@@ -463,9 +463,7 @@ namespace Nez.Sprites
 						var extension = Path.GetExtension(data.TextureFilePath).ToLower();
 						switch (extension)
 						{
-							case ".png":
-							case ".jpg":
-							case ".jpeg":
+							case ".png": 
 								LoadPngFile(data.TextureFilePath, contentManager);
 								break;
 							case ".ase":
