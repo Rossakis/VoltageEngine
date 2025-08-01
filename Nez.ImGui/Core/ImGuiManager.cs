@@ -392,7 +392,8 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 			}
 			else if (Input.MouseWheelDelta < 0)
 			{
-				Core.Scene.Camera.Zoom -= EditorCameraZoomSpeed * Time.DeltaTime;
+				if (Core.Scene.Camera.Zoom - EditorCameraZoomSpeed * Time.DeltaTime > -0.9)
+					Core.Scene.Camera.Zoom -= EditorCameraZoomSpeed * Time.DeltaTime;
 			}
 		}
 		else

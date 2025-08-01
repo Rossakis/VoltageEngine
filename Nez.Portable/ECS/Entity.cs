@@ -681,10 +681,8 @@ public class Entity : IComparable<Entity>
 	/// </summary>
 	public T ReplaceComponent<T>(T component) where T : Component
 	{
-		var existing = Components.FirstOrDefault(c => c.GetType() == component.GetType() && c.Name == component.Name);
-
-		if (existing != null)
-			RemoveComponent(existing);
+		if(HasComponent<T>())
+			RemoveComponent<T>();
 
 		return AddComponent(component);
 	}

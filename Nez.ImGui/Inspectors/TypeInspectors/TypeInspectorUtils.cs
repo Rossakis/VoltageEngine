@@ -7,6 +7,8 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
+using Nez.Sprites;
+using Nez.Textures;
 using TI = Nez.ImGuiTools.TypeInspectors;
 
 
@@ -140,6 +142,10 @@ namespace Nez.ImGuiTools.TypeInspectors
 		/// <param name="memberInfo">Member info.</param>
 		public static AbstractTypeInspector GetInspectorForType(Type valueType, object target, MemberInfo memberInfo)
 		{
+			// //custom
+			// if (valueType == typeof(SpriteRenderer) || valueType.IsSubclassOf(typeof(SpriteRenderer)))
+			// 	return new SpriteRendererFileInspector();
+
 			// built-in types
 			if (SimpleTypeInspector.KSupportedTypes.Contains(valueType))
 				return new TI.SimpleTypeInspector();
@@ -177,6 +183,7 @@ namespace Nez.ImGuiTools.TypeInspectors
 				return new MaterialInspector();
 			if (valueType == effectType || valueType.IsSubclassOf(effectType))
 				return GetEffectInspector(target, memberInfo);
+			
 
 			// last ditch effort. If the class is serializeable we use a generic ObjectInspector
 			if (valueType != objectType && valueType.IsDefined(serializationAttrType))
@@ -193,6 +200,7 @@ namespace Nez.ImGuiTools.TypeInspectors
 		/// </summary>
 		/// <returns>The material inspector.</returns>
 		/// <param name="target">Target.</param>
+		/// <param name="memberInfo">Member info.</param>
 		static AbstractTypeInspector GetMaterialInspector(object target, MemberInfo memberInfo)
 		{
 			Material material = null;

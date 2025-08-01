@@ -45,7 +45,7 @@ public class EntityInspector
 
 		_transformInspector = new TransformInspector(Entity.Transform);
 		for (var i = 0; i < entity.Components.Count; i++)
-			_componentInspectors.Add(new ComponentInspector(entity.Components[i]));
+			_componentInspectors.Add(ComponentInspectorFactory.CreateInspector(entity.Components[i])); // Use factory here
 	}
 
 	public void Draw()

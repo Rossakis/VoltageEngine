@@ -868,6 +868,9 @@ namespace Nez
 				destinationY = Mathf.Round(destinationY);
 			}
 
+			if(sprite == null || sprite.Texture2D == null)
+				return;
+
 			// Source/Destination/Origin Calculations. destinationW/H is the scale value so we multiply by the size of the texture region
 			var originX = (origin.X / sprite.Uvs.Width) / sprite.Texture2D.Width;
 			var originY = (origin.Y / sprite.Uvs.Height) / sprite.Texture2D.Height;

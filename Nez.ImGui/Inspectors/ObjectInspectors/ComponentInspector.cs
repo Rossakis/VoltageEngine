@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using ImGuiNET;
 using Nez.ImGuiTools.TypeInspectors;
+using Nez.Sprites;
 using Nez.Utils.Extensions;
 
 
@@ -20,7 +21,24 @@ namespace Nez.ImGuiTools.ObjectInspectors
 		public ComponentInspector(Component component)
 		{
 			_component = component;
-			_inspectors = TypeInspectorUtils.GetInspectableProperties(component);
+
+			// Special handling for SpriteRenderer (like Transform)
+			if (component is SpriteRenderer spriteRenderer)
+			{
+				// For SpriteRenderer, create a mix of standard + custom inspectors
+				_inspectors = TypeInspectorUtils.GetInspectableProperties(component);
+				
+				// Add the custom file inspector as an additional inspector
+				var fileInspector = new SpriteRendererFileInspector();
+				fileInspector.SetTarget(spriteRenderer, typeof(SpriteRenderer).GetProperty("Sprite"));
+				fileInspector.Initialize();
+				_inspectors.Add(fileInspector);
+			}
+			else
+			{
+				// Normal component inspector setup
+				_inspectors = TypeInspectorUtils.GetInspectableProperties(component);
+			}
 
 			var typeName = _component.GetType().IsGenericType
 				? $"{_component.GetType().BaseType.Name}<{_component.GetType().GetGenericArguments()[0].Name}>"

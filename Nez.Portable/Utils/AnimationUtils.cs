@@ -1,5 +1,9 @@
+using System;
+using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 using Nez;
 using Nez.Sprites;
+using Nez.Textures;
 
 namespace Nez.Utils;
 
@@ -39,5 +43,79 @@ public class AnimationUtils
             entity.GetComponent<SpriteAnimator>().AddAnimation(animationTagName, sprite.GetAnimation(animationTagName));
         else
             entity.GetComponent<SpriteAnimator>().AddAnimation(callableAnimationName, sprite.GetAnimation(animationTagName));
+    }
+
+    /// <summary>
+    /// Loads a specific frame from an Aseprite file as a Sprite, with optional layer filtering.
+    /// </summary>
+    /// <param name="entity">The entity to load the frame for (used to access the content manager)</param>
+    /// <param name="asepriteFilePath">The path to the Aseprite file</param>
+    /// <param name="frameNumber">The frame number to load (0-based index)</param>
+    /// <param name="onlyVisibleLayers">Whether to only include visible layers when flattening the frame</param>
+    /// <param name="includeBackgroundLayer">Whether to include the background layer when flattening the frame</param>
+    /// <param name="layerNames">Optional array of specific layer names to include. If null, all layers (subject to other filters) will be included</param>
+    /// <returns>A Sprite containing the flattened frame data as a Texture2D</returns>
+    public static Sprite LoadAsepriteFrame(Entity entity, string asepriteFilePath, int frameNumber, bool onlyVisibleLayers = true, bool includeBackgroundLayer = false, params string[] layerNames)
+    {
+        var asepriteFile = entity.Scene.Content.LoadAsepriteFile(asepriteFilePath);
+        
+        // Validate frame number
+        if (frameNumber < 0 || frameNumber >= asepriteFile.Frames.Count)
+        {
+            throw new ArgumentOutOfRangeException(nameof(frameNumber), 
+                $"Frame number {frameNumber} is out of range. File has {asepriteFile.Frames.Count} frames.");
+        }
+        
+        var frame = asepriteFile.Frames[frameNumber];
+        Color[] pixels;
+        
+        // Choose the appropriate flattening method based on whether specific layers are requested
+        if (layerNames != null && layerNames.Length > 0)
+        {
+            pixels = frame.FlattenFrameOnLayers(onlyVisibleLayers, includeBackgroundLayer, layerNames);
+        }
+        else
+        {
+            pixels = frame.FlattenFrame(onlyVisibleLayers, includeBackgroundLayer);
+        }
+        
+        // Create texture from the flattened pixel data
+        var texture = new Texture2D(Core.GraphicsDevice, frame.Width, frame.Height);
+        texture.SetData<Color>(pixels);
+        texture.Name = $"{asepriteFilePath}_frame_{frameNumber}";
+        
+        return new Sprite(texture);
+    }
+
+    /// <summary>
+    /// Loads a specific frame from an Aseprite file as a Sprite, filtering by a single layer name.
+    /// </summary>
+    /// <param name="entity">The entity to load the frame for (used to access the content manager)</param>
+    /// <param name="asepriteFilePath">The path to the Aseprite file</param>
+    /// <param name="frameNumber">The frame number to load (0-based index)</param>
+    /// <param name="layerName">The specific layer name to include when flattening the frame</param>
+    /// <param name="onlyVisibleLayers">Whether to only include visible layers when flattening the frame</param>
+    /// <param name="includeBackgroundLayer">Whether to include the background layer when flattening the frame</param>
+    /// <returns>A Sprite containing the flattened frame data as a Texture2D</returns>
+    public static Sprite LoadAsepriteFrameFromLayer(Entity entity, string asepriteFilePath, int frameNumber, string layerName, bool onlyVisibleLayers = true, bool includeBackgroundLayer = false)
+    {
+        var asepriteFile = entity.Scene.Content.LoadAsepriteFile(asepriteFilePath);
+        
+        // Validate frame number
+        if (frameNumber < 0 || frameNumber >= asepriteFile.Frames.Count)
+        {
+            throw new ArgumentOutOfRangeException(nameof(frameNumber), 
+                $"Frame number {frameNumber} is out of range. File has {asepriteFile.Frames.Count} frames.");
+        }
+        
+        var frame = asepriteFile.Frames[frameNumber];
+        var pixels = frame.FlattenFrame(onlyVisibleLayers, includeBackgroundLayer, layerName);
+        
+        // Create texture from the flattened pixel data
+        var texture = new Texture2D(Core.GraphicsDevice, frame.Width, frame.Height);
+        texture.SetData<Color>(pixels);
+        texture.Name = $"{asepriteFilePath}_frame_{frameNumber}_layer_{layerName}";
+        
+        return new Sprite(texture);
     }
 }
