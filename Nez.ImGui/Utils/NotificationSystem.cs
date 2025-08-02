@@ -10,7 +10,7 @@ public class NotificationSystem
     private static float _notificationTimer;
     private const float NotificationDuration = 4.5f; // Seconds
 
-    public static void ShowNotification(string text)
+    public static void ShowTimedNotification(string text)
     {
         _notificationText = text;
         _notificationTimer = NotificationDuration;

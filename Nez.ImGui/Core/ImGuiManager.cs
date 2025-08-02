@@ -59,15 +59,22 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	public static float EditModeCameraSpeed = 250f;
 	public static float EditModeCameraFastSpeed = 500f;
 	private const float EditorCameraZoomSpeed = 1f;
-	public static float CurrentCameraSpeed { get; private set; }
+    
+    // Add these new fields for dynamic speed control
+    public static float EditModeCameraMinSpeed = 50f;
+    public static float EditModeCameraMaxSpeed = 3000f;
+    private static float _dynamicCameraSpeed = EditModeCameraSpeed; // Current dynamic speed
+    private const float CameraSpeedAdjustmentStep = 20f; // How much to change per scroll
+    
+    public static float CurrentCameraSpeed { get; private set; }
 
-	private Vector2 _cameraTargetPosition;
-	private float _cameraLerp = 0.4f;
+    private Vector2 _cameraTargetPosition;
+    private float _cameraLerp = 0.4f;
 
-	// Camera dragging with middle mouse button
-	private bool _isCameraDragging = false;
-	private Vector2 _cameraDragStartMouse;
-	private Vector2 _cameraDragStartPosition;
+    // Camera dragging with middle mouse button
+    private bool _isCameraDragging = false;
+    private Vector2 _cameraDragStartMouse;
+    private Vector2 _cameraDragStartPosition;
 
 	private bool _pendingExit = false;
 	private bool _pendingSceneChange = false;
@@ -178,6 +185,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		}
 
 		UpdateCamera();
+		NotificationSystem.Draw();
 		GlobalKeyCommands();
 	}
 
@@ -342,11 +350,31 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 			if (_cameraTargetPosition == default)
 				_cameraTargetPosition = Core.Scene.Camera.Position;
 
-			if (Input.IsKeyDown(Keys.LeftShift))
-				CurrentCameraSpeed = EditModeCameraFastSpeed;
-			else
-				CurrentCameraSpeed = EditModeCameraSpeed;
+			// Check if we're actively moving the camera with WASD
+			bool isMovingCamera = Input.IsKeyDown(Keys.W) || Input.IsKeyDown(Keys.A) || 
+								 Input.IsKeyDown(Keys.S) || Input.IsKeyDown(Keys.D);
 
+			// Handle camera speed - use dynamic speed when Shift is held and moving
+			if (Input.IsKeyDown(Keys.LeftShift))
+			{
+				if (isMovingCamera)
+				{
+					// Use dynamic speed when actively moving with Shift
+					CurrentCameraSpeed = _dynamicCameraSpeed;
+				}
+				else
+				{
+					// When just holding Shift but not moving, use fast speed
+					CurrentCameraSpeed = EditModeCameraFastSpeed;
+				}
+			}
+			else
+			{
+				// Normal speed when Shift is not held
+				CurrentCameraSpeed = EditModeCameraSpeed;
+			}
+
+			// Camera movement with WASD (only when not holding Ctrl)
 			if (!Input.IsKeyDown(Keys.LeftControl) && !Input.IsKeyDown(Keys.RightControl))
 			{
 				if (Input.IsKeyDown(Keys.D))
@@ -379,35 +407,70 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 				}
 			}
 		}
-
-		NotificationSystem.Draw();
 	}
 
 	private void ManageCameraZoom()
 	{
-		if (Core.IsEditMode)
+		if (Core.IsEditMode && Input.MouseWheelDelta != 0)
 		{
-			if (Input.MouseWheelDelta > 0)
+			// Check if we're actively moving camera with WASD while holding Shift
+			bool isMovingCamera = Input.IsKeyDown(Keys.W) || Input.IsKeyDown(Keys.A) || 
+						 Input.IsKeyDown(Keys.S) || Input.IsKeyDown(Keys.D);
+			bool isShiftHeld = Input.IsKeyDown(Keys.LeftShift);
+
+			if (isShiftHeld && isMovingCamera)
 			{
-				Core.Scene.Camera.Zoom += EditorCameraZoomSpeed * Time.DeltaTime;
+				// Modify camera movement speed instead of zoom
+				float speedDelta = Input.MouseWheelDelta * CameraSpeedAdjustmentStep * Time.DeltaTime;
+				_dynamicCameraSpeed = MathHelper.Clamp(_dynamicCameraSpeed + speedDelta, 
+													   EditModeCameraMinSpeed, 
+													   EditModeCameraMaxSpeed);
+				
 			}
-			else if (Input.MouseWheelDelta < 0)
+			else
 			{
-				if (Core.Scene.Camera.Zoom - EditorCameraZoomSpeed * Time.DeltaTime > -0.9)
-					Core.Scene.Camera.Zoom -= EditorCameraZoomSpeed * Time.DeltaTime;
+				// Normal zoom behavior
+				if (Input.MouseWheelDelta > 0)
+				{
+					Core.Scene.Camera.Zoom += EditorCameraZoomSpeed * Time.DeltaTime;
+				}
+				else if (Input.MouseWheelDelta < 0)
+				{
+					if (Core.Scene.Camera.Zoom - EditorCameraZoomSpeed * Time.DeltaTime > -0.9)
+						Core.Scene.Camera.Zoom -= EditorCameraZoomSpeed * Time.DeltaTime;
+				}
 			}
 		}
-		else
+		else if (!Core.IsEditMode)
 		{
 			Core.Scene.Camera.Zoom = Camera.DefaultZoom;
 		}
 	}
 
-	public void SetCameraTargetPosition(Vector2 position)
+	/// <summary>
+	/// Reset dynamic camera speed to default
+	/// </summary>
+	public static void ResetDynamicCameraSpeed()
 	{
-	    _cameraTargetPosition = position;
+		_dynamicCameraSpeed = EditModeCameraSpeed;
 	}
 
+	/// <summary>
+	/// Set the dynamic camera speed directly
+	/// </summary>
+	public static void SetDynamicCameraSpeed(float speed)
+	{
+		_dynamicCameraSpeed = MathHelper.Clamp(speed, EditModeCameraMinSpeed, EditModeCameraMaxSpeed);
+	}
+
+	/// <summary>
+	/// Get the current dynamic camera speed
+	/// </summary>
+	public static float GetDynamicCameraSpeed()
+	{
+		return _dynamicCameraSpeed;
+	}
+	
 	#region Public API
 
 	/// <summary>
@@ -589,6 +652,12 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		}
 	}
 	
+	public void SetCameraTargetPosition(Vector2 position)
+	{
+		// Smoothly move camera to the selected entity's position
+		_cameraTargetPosition = position;
+	}
+
 	public void DeselectEntity()
 	{
 		if (SceneGraphWindow?.EntityPane != null)

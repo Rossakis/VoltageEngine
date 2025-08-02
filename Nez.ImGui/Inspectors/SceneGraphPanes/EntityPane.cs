@@ -409,7 +409,7 @@ public class EntityPane
 	    {
 	        if (entity != null && entity.Type == Entity.InstanceType.HardCoded)
 	        {
-	            NotificationSystem.ShowNotification("Cannot duplicate HardCoded entities.");
+	            NotificationSystem.ShowTimedNotification("Cannot duplicate HardCoded entities.");
 	            return true; 
 	        }
 	        return false;

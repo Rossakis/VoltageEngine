@@ -4,6 +4,7 @@ using ImGuiNET;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using Nez.Editor;
 using Num = System.Numerics;
 using Nez.Persistence.Binary;
 using Nez.Utils;
@@ -152,27 +153,89 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Num.Vector2(0, 0));
 		ImGui.Begin(_gameWindowTitle, _gameWindowFlags);
 
-		// the Reset Camera Zoom
+		// Camera control buttons at top-left
 		var camera = Core.Scene?.Camera;
-		if (camera != null && Math.Abs(camera.Zoom - Camera.DefaultZoom) > 0.01f)
+		bool showZoomButton = camera != null && Math.Abs(camera.Zoom - Camera.DefaultZoom) > 0.01f;
+		bool showSpeedButton = Math.Abs(GetDynamicCameraSpeed() - EditModeCameraSpeed) > 0.1f;
+
+		if (showZoomButton || showSpeedButton)
 		{
-			// Place button at top-left of the window's content region
+			// Place buttons at top-left of the window's content region
 			var windowPos = ImGui.GetWindowPos();
 			var contentMin = ImGui.GetWindowContentRegionMin();
-			var buttonPos = windowPos + contentMin + new Num.Vector2(8, 8) * ImGui.GetIO().FontGlobalScale;
+			var buttonStartPos = windowPos + contentMin + new Num.Vector2(8, 8) * ImGui.GetIO().FontGlobalScale;
 
-			ImGui.SetCursorScreenPos(buttonPos);
+			ImGui.SetCursorScreenPos(buttonStartPos);
 
-			// Calculate button size based on text
-			var buttonText = "Reset Camera Zoom";
-			var textSize = ImGui.CalcTextSize(buttonText);
-			var padding = new Num.Vector2(16, 8) * ImGui.GetIO().FontGlobalScale;
-			var buttonSize = textSize + padding;
-
-			if (ImGui.Button(buttonText, buttonSize))
+			// Reset Camera Zoom button
+			if (showZoomButton)
 			{
-				camera.Zoom = Camera.DefaultZoom;
+				var zoomButtonText = "Reset Camera Zoom";
+				var zoomTextSize = ImGui.CalcTextSize(zoomButtonText);
+				var zoomPadding = new Num.Vector2(16, 8) * ImGui.GetIO().FontGlobalScale;
+				var zoomButtonSize = zoomTextSize + zoomPadding;
+
+				if (ImGui.Button(zoomButtonText, zoomButtonSize))
+				{
+					camera.Zoom = Camera.DefaultZoom;
+				}
+
+				// If both buttons are showing, put them on the same line
+				if (showSpeedButton)
+				{
+					ImGui.SameLine(0, 8f * ImGui.GetIO().FontGlobalScale); // Small spacing between buttons
+				}
 			}
+
+			// Reset Camera Speed button
+			if (showSpeedButton)
+			{
+				var speedButtonText = "Reset Camera Speed";
+				var speedTextSize = ImGui.CalcTextSize(speedButtonText);
+				var speedPadding = new Num.Vector2(16, 8) * ImGui.GetIO().FontGlobalScale;
+				var speedButtonSize = speedTextSize + speedPadding;
+
+				if (ImGui.Button(speedButtonText, speedButtonSize))
+				{
+					ResetDynamicCameraSpeed();
+				}
+			}
+		}
+
+		// Camera Speed Indicator at top-right (only in edit mode and when speed is modified)
+		if (Core.IsEditMode && Math.Abs(GetDynamicCameraSpeed() - EditModeCameraSpeed) > 0.1f)
+		{
+			var speedText = $"Camera Speed: {(int)GetDynamicCameraSpeed()}";
+			var speedTextSize = ImGui.CalcTextSize(speedText);
+			
+			// Calculate position for top-right corner
+			var windowPos = ImGui.GetWindowPos();
+			var contentMin = ImGui.GetWindowContentRegionMin();
+			var contentMax = ImGui.GetWindowContentRegionMax();
+			var margin = new Num.Vector2(8, 8) * ImGui.GetIO().FontGlobalScale;
+			
+			var speedTextPos = new Num.Vector2(
+				windowPos.X + contentMax.X - speedTextSize.X - margin.X,
+				windowPos.Y + contentMin.Y + margin.Y
+			);
+
+			ImGui.SetCursorScreenPos(speedTextPos);
+			
+			// Semi-transparent background
+			var drawList = ImGui.GetWindowDrawList();
+			var bgPadding = new Num.Vector2(8, 4) * ImGui.GetIO().FontGlobalScale;
+			var bgMin = speedTextPos - bgPadding;
+			var bgMax = speedTextPos + speedTextSize + bgPadding;
+			
+			drawList.AddRectFilled(
+				bgMin, 
+				bgMax, 
+				ImGui.ColorConvertFloat4ToU32(new Num.Vector4(0.0f, 0.0f, 0.0f, 0.6f)), // Semi-transparent black
+				4.0f * ImGui.GetIO().FontGlobalScale // Rounded corners
+			);
+
+			// Draw the text in a contrasting color
+			ImGui.TextColored(new Num.Vector4(1.0f, 1.0f, 0.0f, 1.0f), speedText); // Yellow text
 		}
 
 		// convert mouse input to the game windows coordinates
