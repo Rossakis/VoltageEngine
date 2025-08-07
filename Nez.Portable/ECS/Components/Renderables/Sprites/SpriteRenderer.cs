@@ -234,12 +234,6 @@ namespace Nez.Sprites
 					RenderLayer = spriteData.RenderLayer;
 					Enabled = spriteData.Enabled;
 					SpriteEffects = spriteData.SpriteEffects;
-					//
-					// // ONLY load image if this is a SpriteEntity (not Platform, Player, etc.)
-					if (!string.IsNullOrEmpty(spriteData.TextureFilePath))
-					{
-						LoadImageFromData();
-					}
 				}
 			}
 		}
@@ -463,20 +457,23 @@ namespace Nez.Sprites
 
 		public override void Render(Batcher batcher, Camera camera)
 		{
-			// if (Sprite == null)
-			// {
-			// 	Debug.Error($"SpriteRenderer on entity '{Entity?.Name}' has null Sprite!");
-			// 	return;
-			// }
-			//
-			// if (Sprite.Texture2D == null)
-			// {
-			// 	Debug.Error($"SpriteRenderer on entity '{Entity?.Name}' has Sprite with null Texture2D!");
-			// 	return;
-			// }
-
 			batcher.Draw(Sprite, Entity.Transform.Position + LocalOffset, Color, Entity.Transform.Rotation, 
 						 Origin, Entity.Transform.Scale, SpriteEffects, LayerDepth);
+		}
+
+		/// <summary>
+		/// Called when this component is added to an entity. 
+		/// If we have saved texture file path data, load the image automatically.
+		/// </summary>
+		public override void OnAddedToEntity()
+		{
+			base.OnAddedToEntity();
+
+			// If we have texture file path data but no sprite loaded, load it
+			if (!string.IsNullOrEmpty(_data?.TextureFilePath) && Sprite == null)
+			{
+				LoadImageFromData();
+			}
 		}
 
 		/// <summary>
@@ -489,12 +486,6 @@ namespace Nez.Sprites
 			{
 				Debug.Warn($"SpriteRenderer has no texture file path to load from.");
 				return;
-			}
-			
-			// Log what we're about to load
-			if (Sprite == null)
-			{
-				Debug.Log($"SpriteRenderer loading image from saved data: {_data.TextureFilePath} (FileType: {_data.FileType})");
 			}
 
 			// Try to get content manager, but handle case where entity isn't in scene yet
@@ -592,8 +583,6 @@ namespace Nez.Sprites
 					// Update the data field properly
 					_data.SetPngData();
 					_data.TextureFilePath = normalizedPath;
-					
-					Debug.Log($"Successfully loaded PNG file: {normalizedPath}");
 				}
 				else
 				{
@@ -654,8 +643,6 @@ namespace Nez.Sprites
 						// Update the data field properly
 						_data.SetAsepriteData(layerName, frameNumber);
 						_data.TextureFilePath = filepath;
-						
-                        Debug.Log($"Successfully loaded Aseprite file: {filepath}, frame: {frameNumber}" + (layerName != null ? $", layer: {layerName}" : ""));
 					}
 					else
 					{
@@ -732,6 +719,115 @@ namespace Nez.Sprites
 			}
 
 			return this;
+		}
+
+		/// <summary>
+		/// Creates a deep clone of this SpriteRenderer component.
+		/// </summary>
+		/// <returns>A new SpriteRenderer instance with all properties and data deep-copied</returns>
+		public override Component Clone()
+		{
+			var clone = new SpriteRenderer();
+			
+			// Copy basic RenderableComponent properties
+			clone.LocalOffset = LocalOffset;
+			clone.Color = Color;
+			clone.LayerDepth = LayerDepth;
+			clone.RenderLayer = RenderLayer;
+			clone.Enabled = Enabled;
+			clone.Name = Name;
+			
+			// Deep clone Material to prevent shared references
+			if (Material != null)
+			{
+				clone.Material = Material.Clone(); 
+			}
+			else
+				clone.Material = null; 
+
+
+			// Copy SpriteRenderer-specific properties
+			clone.SpriteEffects = SpriteEffects;
+			clone.IsSelectableInEditor = IsSelectableInEditor;
+			
+			// Deep clone the sprite if it exists
+			if (_sprite != null)
+			{
+				clone._sprite = _sprite.Clone();
+			}
+			
+			// Deep clone the origin
+			clone._origin = _origin;
+			
+			// Deep clone the component data
+			if (_data != null)
+			{
+				clone._data = CloneSpriteRendererComponentData(_data);
+			}
+			else
+			{
+				clone._data = new SpriteRendererComponentData();
+			}
+			
+			// Reset entity-specific state (the clone isn't attached to any entity yet)
+			clone.Entity = null;
+			clone._areBoundsDirty = true;
+			
+			return clone;
+		}
+
+		/// <summary>
+		/// Helper method to deep clone SpriteRendererComponentData
+		/// </summary>
+		/// <param name="original">The original data to clone</param>
+		/// <returns>A deep copy of the component data</returns>
+		private static SpriteRendererComponentData CloneSpriteRendererComponentData(SpriteRendererComponentData original)
+		{
+			var clone = new SpriteRendererComponentData();
+			
+			// Copy all primitive properties
+			clone.TextureFilePath = original.TextureFilePath;
+			clone.ColorR = original.ColorR;
+			clone.ColorG = original.ColorG;
+			clone.ColorB = original.ColorB;
+			clone.ColorA = original.ColorA;
+			clone.LocalOffset = original.LocalOffset;
+			clone.Origin = original.Origin;
+			clone.LayerDepth = original.LayerDepth;
+			clone.RenderLayer = original.RenderLayer;
+			clone.Enabled = original.Enabled;
+			clone.SpriteEffects = original.SpriteEffects;
+			clone.FileType = original.FileType;
+			
+			// Deep clone the nullable structs
+			if (original.AsepriteData.HasValue)
+			{
+				var originalAse = original.AsepriteData.Value;
+				clone.AsepriteData = new SpriteRendererComponentData.AsepriteImageData(
+					originalAse.LayerName,
+					originalAse.FrameNumber,
+					originalAse.OnlyVisibleLayers,
+					originalAse.IncludeBackgroundLayer
+				);
+			}
+			else
+			{
+				clone.AsepriteData = null;
+			}
+			
+			if (original.TiledData.HasValue)
+			{
+				var originalTiled = original.TiledData.Value;
+				clone.TiledData = new SpriteRendererComponentData.TiledImageData(
+					originalTiled.ImageLayerName
+				);
+			}
+			else
+			{
+				clone.TiledData = null;
+			}
+			
+			return clone;
 		}
 	}
 }

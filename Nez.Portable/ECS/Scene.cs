@@ -971,8 +971,8 @@ public class Scene
 	public Entity SimpleCreateEntity<TData>(string name) where TData : EntityData, new()
 	{
 		var entity = new Entity(name);
-		if (!entity.HasComponent<TData>())
-			entity.AddComponent(new TData()); 
+		if (entity.EntityData == null)
+			entity.EntityData = new TData();
 
 		return AddEntity(entity);
 	}
@@ -987,8 +987,8 @@ public class Scene
 	{
 		var entity = new Entity(name);
 		entity.Transform.Position = position;
-		if(!entity.HasComponent<TData>())
-			entity.AddComponent(new TData());
+		if(entity.EntityData == null)
+			entity.EntityData = new TData();
 
 		return AddEntity(entity);
 	}
@@ -1117,18 +1117,6 @@ public class Scene
 		return entity;
 	}
 
-
-	/// <summary>
-	/// adds an Entity to the Scene's Entities list with EntityData of Type TData.
-	/// </summary>
-	/// <param name="entity">The Entity to add</param>
-	public virtual Entity AddEntityWithEntityData<TData>(Entity entity) where TData : EntityData, new()
-	{
-		entity.AddComponent<TData>();
-		AddEntity<Entity>(entity);
-		return entity;
-	}
-
 	/// <summary>
 	/// adds an Entity to the Scene's Entities list
 	/// </summary>
@@ -1201,6 +1189,17 @@ public class Scene
 	public List<T> FindComponentsOfType<T>() where T : Component
 	{
 		return Entities.FindComponentsOfType<T>();
+	}
+
+	/// <summary>
+	/// returns the first enabled loaded component of Type T with the specified name
+	/// </summary>
+	/// <returns>The component with the given name and type.</returns>
+	/// <param name="name">Name of the component to find.</param>
+	/// <typeparam name="T">The component type.</typeparam>
+	public T FindComponentWithName<T>(string name) where T : Component
+	{
+		return Entities.FindComponentWithName<T>(name);
 	}
 
 	/// <summary>

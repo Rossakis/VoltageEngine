@@ -208,10 +208,20 @@ namespace Nez.ImGuiTools
 			}
 
 			// Add ImGui keys that do not have a direct XNA mapping
+			_keys.Add(io.KeyMap[(int)ImGuiKey.Tab] = (int)Keys.Tab);
 			_keys.Add(io.KeyMap[(int)ImGuiKey.LeftArrow] = (int)Keys.Left);
 			_keys.Add(io.KeyMap[(int)ImGuiKey.RightArrow] = (int)Keys.Right);
 			_keys.Add(io.KeyMap[(int)ImGuiKey.UpArrow] = (int)Keys.Up);
 			_keys.Add(io.KeyMap[(int)ImGuiKey.DownArrow] = (int)Keys.Down);
+			_keys.Add(io.KeyMap[(int)ImGuiKey.PageUp] = (int)Keys.PageUp);
+			_keys.Add(io.KeyMap[(int)ImGuiKey.PageDown] = (int)Keys.PageDown);
+			_keys.Add(io.KeyMap[(int)ImGuiKey.Home] = (int)Keys.Home);
+			_keys.Add(io.KeyMap[(int)ImGuiKey.End] = (int)Keys.End);
+			_keys.Add(io.KeyMap[(int)ImGuiKey.Delete] = (int)Keys.Delete);
+			_keys.Add(io.KeyMap[(int)ImGuiKey.Backspace] = (int)Keys.Back);
+			_keys.Add(io.KeyMap[(int)ImGuiKey.Enter] = (int)Keys.Enter);
+			_keys.Add(io.KeyMap[(int)ImGuiKey.Escape] = (int)Keys.Escape);
+			_keys.Add(io.KeyMap[(int)ImGuiKey.LeftCtrl] = (int)Keys.LeftControl);
 
 			// Add all XNA keys to _keys for full coverage (for UpdateInput)
 			foreach (Keys key in Enum.GetValues(typeof(Keys)))

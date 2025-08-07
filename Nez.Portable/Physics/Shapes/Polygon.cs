@@ -242,6 +242,16 @@ namespace Nez.PhysicsShapes
 
 		public override void RecalculateBounds(Collider collider)
 		{
+			// Add null safety check at the beginning
+			if (collider?.Entity?.Transform == null)
+			{
+				// Set default values and return early if we don't have a valid entity/transform
+				Center = collider?.LocalOffset ?? Vector2.Zero;
+				Position = Center;
+				Bounds = RectangleF.Empty;
+				return;
+			}
+
 			// if we dont have rotation or dont care about TRS we use localOffset as the center so we'll start with that
 			Center = collider.LocalOffset;
 
@@ -368,6 +378,35 @@ namespace Nez.PhysicsShapes
 		public override bool PointCollidesWithShape(Vector2 point, out CollisionResult result)
 		{
 			return ShapeCollisions.PointToPoly(point, this, out result);
+		}
+
+		/// <summary>
+		/// Creates a deep clone of this Polygon shape.
+		/// </summary>
+		/// <returns>A new Polygon instance with all properties deep-copied</returns>
+		public override Shape Clone()
+		{
+			var clone = new Polygon((Vector2[])OriginalPoints.Clone(), IsBox);
+			
+			// Copy all properties
+			clone.Position = Position;
+			clone.Center = Center;
+			clone.Bounds = Bounds;
+			clone.PolygonCenter = PolygonCenter;
+			clone.IsUnrotated = IsUnrotated;
+			clone.AreEdgeNormalsDirty = true; // Force rebuild of edge normals
+			
+			// Deep copy Points array if it exists
+			if (Points != null)
+			{
+				clone.Points = new Vector2[Points.Length];
+				Array.Copy(Points, clone.Points, Points.Length);
+			}
+			
+			// Edge normals will be rebuilt on demand
+			clone._edgeNormals = null;
+			
+			return clone;
 		}
 
 		#endregion

@@ -7,7 +7,8 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
+using System.IO;
+using Nez.Editor;
 using Num = System.Numerics;
 
 namespace Nez.ImGuiTools;
@@ -26,12 +27,15 @@ public class MainEntityInspector
 	private readonly string _windowId = "MAIN_INSPECTOR_WINDOW";
 	private TransformInspector _transformInspector;
 	private List<IComponentInspector> _componentInspectors = new();
-	private string _componentNameFilter;
 
 	private bool _isEditingUpdateInterval = false;
 	private uint _updateIntervalEditStartValue;
 	private bool _isEditingName = false;
 	private string _nameEditStartValue;
+
+	// Prefab creation popup fields
+	private string _prefabName = "";
+	private ImGuiManager _imguiManager;
 
 	public MainEntityInspector(Entity entity = null)
 	{
@@ -63,6 +67,9 @@ public class MainEntityInspector
 	{
 		if (!IsOpen)
 			return;
+
+		if(_imguiManager == null)
+			_imguiManager = Core.GetGlobalManager<ImGuiManager>();
 
 		var topMargin = 20f * ImGui.GetIO().FontGlobalScale;
 
@@ -279,13 +286,13 @@ public class MainEntityInspector
 					NezImGui.MediumVerticalSpace();
 				}
 
-				if (NezImGui.CenteredButton("Add Component", 0.6f))
+				if (NezImGui.CenteredButton("Create Prefab", 0.6f))
 				{
-					_componentNameFilter = "";
-					ImGui.OpenPopup("component-selector");
+					_prefabName = Entity.Name + "_Prefab";
+					ImGui.OpenPopup("prefab-creator");
 				}
-
-				DrawComponentSelectorPopup();
+				
+				DrawPrefabCreatorPopup();
 			}
 		}
 
@@ -295,6 +302,158 @@ public class MainEntityInspector
 
 		if (!open)
 			Core.GetGlobalManager<ImGuiManager>().CloseMainEntityInspector();
+	}
+
+	/// <summary>
+	/// Draws the prefab creation popup with name input and create/cancel buttons.
+	/// </summary>
+	private void DrawPrefabCreatorPopup()
+	{
+		// Center the popup when it first appears
+		var center = new Num.Vector2(Screen.Width * 0.5f, Screen.Height * 0.4f);
+		ImGui.SetNextWindowPos(center, ImGuiCond.Appearing, new Num.Vector2(0.5f, 0.5f));
+
+		bool open = true;
+		if (ImGui.BeginPopupModal("prefab-creator", ref open, ImGuiWindowFlags.AlwaysAutoResize))
+		{
+			ImGui.Text("Create Prefab from Entity");
+			ImGui.Separator();
+			
+			ImGui.Text("Prefab Name:");
+			ImGui.InputText("##PrefabName", ref _prefabName, 50);
+
+			// Check if prefab name already exists and show warning
+			var correctedName = CorrectPrefabName(_prefabName.Trim(), Entity.GetType().Name);
+			bool prefabExists = CheckPrefabExists(correctedName);
+			
+			if (prefabExists)
+			{
+				ImGui.TextColored(new Num.Vector4(1.0f, 0.2f, 0.2f, 1.0f), $"Warning: Prefab '{correctedName}' already exists!");
+			}
+
+			NezImGui.MediumVerticalSpace();
+
+			// Center the buttons
+			var buttonWidth = 80f;
+			var spacing = 10f;
+			var totalButtonWidth = (buttonWidth * 2) + spacing;
+			var windowWidth = ImGui.GetWindowSize().X;
+			var centerStart = (windowWidth - totalButtonWidth) * 0.5f;
+			
+			ImGui.SetCursorPosX(centerStart);
+			
+			// Disable create button if prefab exists
+			if (prefabExists)
+				ImGui.BeginDisabled();
+			
+			if (ImGui.Button("Create", new Num.Vector2(buttonWidth, 0)))
+			{
+				if (!string.IsNullOrWhiteSpace(_prefabName))
+				{
+					CreatePrefabFromEntity(correctedName);
+					ImGui.CloseCurrentPopup();
+				}
+			}
+			
+			if (prefabExists)
+				ImGui.EndDisabled();
+			
+			ImGui.SameLine();
+			
+			if (ImGui.Button("Cancel", new Num.Vector2(buttonWidth, 0)))
+			{
+				ImGui.CloseCurrentPopup();
+			}
+
+			ImGui.EndPopup();
+		}
+	}
+
+	/// <summary>
+	/// Checks if a prefab with the given name already exists.
+	/// </summary>
+	/// <param name="prefabName">Name of the prefab to check</param>
+	/// <returns>True if prefab exists, false otherwise</returns>
+	private bool CheckPrefabExists(string prefabName)
+	{
+		var prefabFilePath = $"Content/Data/Prefabs/{prefabName}.json";
+		return File.Exists(prefabFilePath);
+	}
+
+	/// <summary>
+	/// Creates a prefab from the current entity using the DuplicateEntity method from EntityPane.
+	/// Handles async saving and notifications.
+	/// </summary>
+	private async void CreatePrefabFromEntity(string prefabName)
+	{
+		if (Entity == null || _imguiManager?.SceneGraphWindow?.EntityPane == null)
+			return;
+
+		// Use the existing DuplicateEntity method from EntityPane
+		var newPrefab = _imguiManager.SceneGraphWindow.EntityPane.DuplicateEntity(Entity, prefabName, Entity.InstanceType.Prefab);
+		
+		if (newPrefab != null)
+		{
+			// Save the prefab using the async event system
+			bool saveSuccessful = await _imguiManager.InvokePrefabCreated(newPrefab);
+			
+			if (saveSuccessful)
+			{
+				// Add the new prefab to the cache so it appears in the entity selector
+				_imguiManager.SceneGraphWindow.AddPrefabToCache(newPrefab.Name);
+				NotificationSystem.ShowTimedNotification($"Successfully created and saved prefab: {newPrefab.Name}");
+			}
+			else
+			{
+				NotificationSystem.ShowTimedNotification($"Failed to save prefab: {newPrefab.Name} - Prefab with this name already exists!");
+			}
+		}
+		else
+		{
+			NotificationSystem.ShowTimedNotification($"Failed to create prefab: {prefabName}");
+		}
+	}
+
+	/// <summary>
+	/// Corrects the prefab name to follow the convention: EntityTypeName_PrefabName
+	/// If the name doesn't start with the entity type followed by a separator, it adds the prefix.
+	/// </summary>
+	/// <param name="inputName">The user-provided prefab name</param>
+	/// <param name="entityTypeName">The entity's type name</param>
+	/// <returns>Corrected prefab name</returns>
+	private string CorrectPrefabName(string inputName, string entityTypeName)
+	{
+		if (string.IsNullOrWhiteSpace(inputName))
+			return $"{entityTypeName}_Prefab";
+
+		// Check if the name already starts with the entity type followed by a separator
+		var separators = new char[] { '_', '-', '&', '#', '@'};
+		var expectedPrefix = entityTypeName;
+		
+		// Check if it starts with EntityTypeName followed by any separator
+		if (inputName.StartsWith(expectedPrefix, StringComparison.OrdinalIgnoreCase))
+		{
+			// Check if the character after the entity type name is a valid separator
+			if (inputName.Length > expectedPrefix.Length)
+			{
+				var nextChar = inputName[expectedPrefix.Length];
+				if (separators.Contains(nextChar))
+				{
+					// Name is already correctly formatted
+					return inputName;
+				}
+			}
+		}
+
+		// Name doesn't follow the convention, so add the prefix
+		// Remove any leading separators from the input name
+		var cleanedName = inputName.TrimStart(separators);
+		
+		// If the cleaned name is empty or just whitespace, use default
+		if (string.IsNullOrWhiteSpace(cleanedName))
+			cleanedName = "Prefab";
+
+		return $"{entityTypeName}_{cleanedName}";
 	}
 
 	/// <summary>
@@ -311,12 +470,5 @@ public class MainEntityInspector
 	{
 		yield return Coroutine.WaitForSeconds(time);
 		SetEntity(entity);
-	}
-
-	private void DrawComponentSelectorPopup()
-	{
-		if (Entity == null) return;
-
-		EntityInspector.DrawComponentSelector(Entity, _componentNameFilter);
 	}
 }

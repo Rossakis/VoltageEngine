@@ -326,17 +326,82 @@ namespace Nez
 		}
 
 		/// <summary>
-		/// clones the Material. Note that the Effect is not cloned. It is the same instance as the original Material.
+		/// Creates a deep clone of this Material. The Effect is shared (not cloned) as Effects are typically reusable resources.
+		/// All state objects (BlendState, DepthStencilState, SamplerState) are cloned to ensure independent material behavior.
 		/// </summary>
+		/// <returns>A new Material instance with independent state but shared Effect</returns>
 		public Material Clone()
 		{
-			return new Material
+			var clone = new Material();
+			
+			// Clone state objects to ensure independence
+			if (BlendState != null && BlendState != BlendState.AlphaBlend)
 			{
-				BlendState = BlendState,
-				DepthStencilState = DepthStencilState,
-				SamplerState = SamplerState,
-				Effect = Effect
-			};
+				// Create new BlendState with same properties
+				clone.BlendState = new BlendState
+				{
+					ColorSourceBlend = BlendState.ColorSourceBlend,
+					ColorDestinationBlend = BlendState.ColorDestinationBlend,
+					ColorBlendFunction = BlendState.ColorBlendFunction,
+					AlphaSourceBlend = BlendState.AlphaSourceBlend,
+					AlphaDestinationBlend = BlendState.AlphaDestinationBlend,
+					AlphaBlendFunction = BlendState.AlphaBlendFunction
+				};
+			}
+			else
+			{
+				clone.BlendState = BlendState; // Safe to share default BlendState
+			}
+
+			if (DepthStencilState != null && DepthStencilState != DepthStencilState.None)
+			{
+				// Create new DepthStencilState with same properties
+				clone.DepthStencilState = new DepthStencilState
+				{
+					StencilEnable = DepthStencilState.StencilEnable,
+					StencilFunction = DepthStencilState.StencilFunction,
+					StencilPass = DepthStencilState.StencilPass,
+					StencilFail = DepthStencilState.StencilFail,
+					StencilDepthBufferFail = DepthStencilState.StencilDepthBufferFail,
+					TwoSidedStencilMode = DepthStencilState.TwoSidedStencilMode,
+					CounterClockwiseStencilFunction = DepthStencilState.CounterClockwiseStencilFunction,
+					CounterClockwiseStencilPass = DepthStencilState.CounterClockwiseStencilPass,
+					CounterClockwiseStencilFail = DepthStencilState.CounterClockwiseStencilFail,
+					CounterClockwiseStencilDepthBufferFail = DepthStencilState.CounterClockwiseStencilDepthBufferFail,
+					ReferenceStencil = DepthStencilState.ReferenceStencil,
+					DepthBufferEnable = DepthStencilState.DepthBufferEnable,
+					DepthBufferWriteEnable = DepthStencilState.DepthBufferWriteEnable,
+					DepthBufferFunction = DepthStencilState.DepthBufferFunction
+				};
+			}
+			else
+			{
+				clone.DepthStencilState = DepthStencilState; // Safe to share default DepthStencilState
+			}
+
+			if (SamplerState != null && SamplerState != Core.DefaultSamplerState)
+			{
+				// Create new SamplerState with same properties
+				clone.SamplerState = new SamplerState
+				{
+					Filter = SamplerState.Filter,
+					AddressU = SamplerState.AddressU,
+					AddressV = SamplerState.AddressV,
+					AddressW = SamplerState.AddressW,
+					MipMapLevelOfDetailBias = SamplerState.MipMapLevelOfDetailBias,
+					MaxMipLevel = SamplerState.MaxMipLevel,
+					MaxAnisotropy = SamplerState.MaxAnisotropy
+				};
+			}
+			else
+			{
+				clone.SamplerState = SamplerState; // Safe to share default SamplerState
+			}
+
+			// Share the Effect - Effects are typically reusable resources and shouldn't be cloned
+			clone.Effect = Effect;
+
+			return clone;
 		}
 	}
 }

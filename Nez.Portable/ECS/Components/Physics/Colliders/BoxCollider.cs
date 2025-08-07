@@ -1,4 +1,5 @@
-﻿using Microsoft.Xna.Framework;
+﻿using System.Linq;
+using Microsoft.Xna.Framework;
 using Nez.PhysicsShapes;
 
 
@@ -10,7 +11,12 @@ namespace Nez
 		[Range(1, float.MaxValue, true)]
 		public float Width
 		{
-			get => ((Box) Shape).Width;
+			get 
+			{
+				if (Shape is Box box)
+					return box.Width;
+				return 1f; // Default fallback
+			}
 			set => SetWidth(value);
 		}
 
@@ -18,7 +24,12 @@ namespace Nez
 		[Range(1, float.MaxValue, true)]
 		public float Height
 		{
-			get => ((Box) Shape).Height;
+			get 
+			{
+				if (Shape is Box box)
+					return box.Height;
+				return 1f; // Default fallback
+			}
 			set => SetHeight(value);
 		}
 
@@ -65,28 +76,6 @@ namespace Nez
 		#region Fluent setters
 
 		/// <summary>
-		/// sets the size of the BoxCollider
-		/// </summary>
-		/// <returns>The size.</returns>
-		/// <param name="width">Width.</param>
-		/// <param name="height">Height.</param>
-		public BoxCollider SetSize(float width, float height)
-		{
-			_colliderRequiresAutoSizing = false;
-			var box = Shape as Box;
-			if (width != box.Width || height != box.Height)
-			{
-				// update the box, dirty our bounds and if we need to update our bounds in the Physics system
-				box.UpdateBox(width, height);
-				_isPositionDirty = true;
-				if (Entity != null && _isParentEntityAddedToScene && Enabled)
-					Physics.UpdateCollider(this);
-			}
-
-			return this;
-		}
-
-		/// <summary>
 		/// sets the width of the BoxCollider
 		/// </summary>
 		/// <returns>The width.</returns>
@@ -94,8 +83,15 @@ namespace Nez
 		public BoxCollider SetWidth(float width)
 		{
 			_colliderRequiresAutoSizing = false;
-			var box = Shape as Box;
-			if (width != box.Width)
+			
+			// Ensure we have a Box shape
+			if (!(Shape is Box box))
+			{
+				Shape = new Box(width, Height);
+				box = Shape as Box;
+			}
+			
+			if (box != null && width != box.Width)
 			{
 				// update the box, dirty our bounds and if we need to update our bounds in the Physics system
 				box.UpdateBox(width, box.Height);
@@ -115,11 +111,47 @@ namespace Nez
 		public BoxCollider SetHeight(float height)
 		{
 			_colliderRequiresAutoSizing = false;
-			var box = Shape as Box;
-			if (height != box.Height)
+			
+			// Ensure we have a Box shape
+			if (!(Shape is Box box))
+			{
+				Shape = new Box(Width, height);
+				box = Shape as Box;
+			}
+			
+			if (box != null && height != box.Height)
 			{
 				// update the box, dirty our bounds and if we need to update our bounds in the Physics system
 				box.UpdateBox(box.Width, height);
+				_isPositionDirty = true;
+				if (Entity != null && _isParentEntityAddedToScene && Enabled)
+					Physics.UpdateCollider(this);
+			}
+
+			return this;
+		}
+
+		/// <summary>
+		/// sets the size of the BoxCollider
+		/// </summary>
+		/// <returns>The size.</returns>
+		/// <param name="width">Width.</param>
+		/// <param name="height">Height.</param>
+		public BoxCollider SetSize(float width, float height)
+		{
+			_colliderRequiresAutoSizing = false;
+			
+			// Ensure we have a Box shape
+			if (!(Shape is Box box))
+			{
+				Shape = new Box(width, height);
+				box = Shape as Box;
+			}
+			
+			if (box != null && (width != box.Width || height != box.Height))
+			{
+				// update the box, dirty our bounds and if we need to update our bounds in the Physics system
+				box.UpdateBox(width, height);
 				_isPositionDirty = true;
 				if (Entity != null && _isParentEntityAddedToScene && Enabled)
 					Physics.UpdateCollider(this);
@@ -150,6 +182,66 @@ namespace Nez
 		public string PrintBounds()
 		{
 			return string.Format("[BoxCollider: bounds: {0}", Bounds);
+		}
+		
+		/// <summary>
+		/// Creates a deep clone of this BoxCollider component.
+		/// </summary>
+		/// <returns>A new BoxCollider instance with all properties deep-copied</returns>
+		public override Component Clone()
+		{
+			// Get current dimensions before cloning
+			float currentWidth = 1f;
+			float currentHeight = 1f;
+			
+			if (Shape is Box currentBox)
+			{
+				currentWidth = currentBox.Width;
+				currentHeight = currentBox.Height;
+			}
+			
+			var clone = new BoxCollider();
+			
+			// Copy all base Collider properties
+			clone.IsTrigger = IsTrigger;
+			clone.PhysicsLayer = PhysicsLayer;
+			clone.CollidesWithLayers = CollidesWithLayers;
+			clone.ShouldColliderScaleAndRotateWithTransform = ShouldColliderScaleAndRotateWithTransform;
+			clone.LocalOffset = LocalOffset;
+			clone.Enabled = Enabled;
+			clone.Name = Name;
+			
+			// IMPORTANT: Ensure we always create a Box shape, not a generic Polygon
+			clone.Shape = new Box(currentWidth, currentHeight);
+			
+			// Copy internal state flags
+			clone._colliderRequiresAutoSizing = _colliderRequiresAutoSizing;
+			clone._localOffsetLength = _localOffsetLength;
+			
+			// Reset entity-specific state (the clone isn't attached to any entity yet)
+			clone.Entity = null;
+			clone._isParentEntityAddedToScene = false;
+			clone._isColliderRegistered = false;
+			clone._isPositionDirty = true;
+			clone._isRotationDirty = true;
+			
+			// Copy the component data
+			if (Data != null && Data is Collider.ColliderComponentData colliderData)
+			{
+				clone.Data = new Collider.ColliderComponentData
+				{
+					IsTrigger = colliderData.IsTrigger,
+					PhysicsLayer = colliderData.PhysicsLayer,
+					CollidesWithLayers = colliderData.CollidesWithLayers,
+					ShouldColliderScaleAndRotateWithTransform = colliderData.ShouldColliderScaleAndRotateWithTransform,
+					Rectangle = colliderData.Rectangle,
+					CircleRadius = colliderData.CircleRadius,
+					CircleOffset = colliderData.CircleOffset,
+					PolygonPoints = colliderData.PolygonPoints?.ToArray() // Deep copy array if it exists
+				};
+			}
+			
+			return clone;
 		}
 	}
 }

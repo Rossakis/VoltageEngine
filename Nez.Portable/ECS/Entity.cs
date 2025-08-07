@@ -23,9 +23,7 @@ public class Entity : IComparable<Entity>
 		HardCoded,
 
 		/// <summary>
-		/// Can be created at runtime via the Editor,
-		/// and can be later turned into Prefabs.
-		/// NOTE: Usually uses ISceneDataOnly for per-instance parameters.
+		/// Default entities. Can be created at runtime via the Editor, and can be later turned into Prefabs.
 		/// </summary>
 		Dynamic,
 
@@ -69,6 +67,9 @@ public class Entity : IComparable<Entity>
 	/// </summary>
 	[JsonExclude]
 	public readonly ComponentList Components;
+
+	[JsonExclude] 
+	public List<Component> ComponentsToAdd => Components._componentsToAdd;
 
 	/// <summary>
 	/// use this however you want to. It can later be used to query the scene for all Entities with a specific tag
@@ -129,7 +130,36 @@ public class Entity : IComparable<Entity>
 	private readonly Dictionary<Type, List<Delegate>> _componentAddedCallbacks = new();
 	private readonly Dictionary<Type, List<Delegate>> _childAddedCallbacks = new();
 
-	public virtual EntityData Data { get; set; }
+	/// <summary>
+	/// Entity-specific data for serialization.
+	/// </summary>
+	public EntityData EntityData = new EntityData();
+
+	/// <summary>
+	/// Override this in derived classes to provide entity-specific data serialization.
+	/// This is called when the entity needs to serialize its current state.
+	/// </summary>
+	public virtual EntityData GetEntityData()
+	{
+		// Always ensure EntityData has the correct EntityType
+		EntityData.EntityType = GetType().Name;
+		return EntityData;
+	}
+
+	/// <summary>
+	/// Override this in derived classes to apply loaded entity data.
+	/// This is called when entity data is loaded from JSON.
+	/// </summary>
+	public virtual void SetEntityData(EntityData data)
+	{
+		if (data != null)
+		{
+			EntityData = data;
+
+			if (string.IsNullOrEmpty(EntityData.EntityType))
+				EntityData.EntityType = GetType().Name;
+		}
+	}
 
 	#endregion
 
@@ -389,11 +419,14 @@ public class Entity : IComparable<Entity>
 	/// copies the properties, components and colliders of Entity to this instance
 	/// </summary>
 	/// <param name="entity">Entity.</param>
-	public void CopyEntityFrom(Entity entity)
+	public void CopyEntityFrom(Entity entity, string customName = null, InstanceType type = InstanceType.Dynamic)
 	{
-		// Copy basic fields
-		Type = InstanceType.Dynamic;
-		Name = Core.Scene.GetUniqueEntityName(entity.GetType().Name);
+		if(customName != null)
+			Name = customName;
+		else
+			Name = Core.Scene.GetUniqueEntityName(entity.Name);
+
+		Type = type;
 		Transform.Position = entity.Transform.Position;
 		Transform.Rotation = entity.Rotation;
 		Transform.Scale = entity.Scale;
@@ -402,27 +435,21 @@ public class Entity : IComparable<Entity>
 		DebugRenderEnabled = entity.DebugRenderEnabled;
 		UpdateInterval = entity.UpdateInterval;
 		UpdateOrder = entity.UpdateOrder;
-		Enabled = entity.Enabled;
 
-		// Track which components have been handled
-		var handled = new HashSet<Component>();
-
-		// For each component in the source entity
+		// Simple component copying - replace existing components with clones
 		foreach (var sourceComponent in entity.Components)
 		{
-			// Try to find a matching component in this entity (by type and name)
+			// Remove any existing component of the same type and name
 			var targetComponent = Components.FirstOrDefault(c => c.GetType() == sourceComponent.GetType() && c.Name == sourceComponent.Name);
-
 			if (targetComponent != null)
-			{
 				RemoveComponent(targetComponent);
-			}
 
+			// Clone and add the component
 			var clone = sourceComponent.Clone();
 			AddComponent(clone);
-			handled.Add(clone);
 		}
 	}
+
 
 	/// <summary>
 	/// Find a component in this entity that has the same type and name as the source component, and then copies it
@@ -575,6 +602,17 @@ public class Entity : IComparable<Entity>
 	public T GetComponent<T>() where T : class
 	{
 		return Components.GetComponent<T>(false);
+	}
+
+	/// <summary>
+	/// Gets the first component of type T with the specified name and returns it. If no component is found returns null.
+	/// </summary>
+	/// <returns>The component with the given name and type.</returns>
+	/// <param name="name">Name of the component to find.</param>
+	/// <typeparam name="T">The component type.</typeparam>
+	public T GetComponent<T>(string name) where T : class
+	{
+		return Components.GetComponent<T>(name);
 	}
 
 	/// <summary>

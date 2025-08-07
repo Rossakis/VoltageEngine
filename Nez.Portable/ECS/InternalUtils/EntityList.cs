@@ -352,20 +352,31 @@ public class EntityList : IEnumerable<Entity>
 	}
 
 	/// <summary>
-	/// returns all Entities that have a component of type T.
+	/// returns the first Component found in the Scene of type T with the specified name
 	/// </summary>
-	/// <returns>The components of type.</returns>
-	/// <typeparam name="T">The 1st type parameter.</typeparam>
-	// public List<Entity> FindEntitiesWithComponent<T>() where T : Component
-	// {
-	// 	var comps = new List<Entity>();
+	/// <returns>The component with the given name and type.</returns>
+	/// <param name="name">Name of the component to find.</param>
+	/// <typeparam name="T">The component type.</typeparam>
+	public T FindComponentWithName<T>(string name) where T : Component
+	{
+		for (var i = 0; i < _entities.Length; i++)
+			if (_entities.Buffer[i].Enabled)
+			{
+				var comp = _entities.Buffer[i].GetComponent<T>(name);
+				if (comp != null)
+					return comp;
+			}
 
-	// 	for (var i = 0; i < _entities.Length; i++)
-	// 		if (_entities.Buffer[i].TryGetComponent<T>(out var component))
-	// 			comps.Add(_entities.Buffer[i]);
+		foreach (var entity in _entitiesToAdd)
+			if (entity.Enabled)
+			{
+				var comp = entity.GetComponent<T>(name);
+				if (comp != null)
+					return comp;
+			}
 
-	// 	return comps;
-	// }
+		return null;
+	}
 
 	#endregion
 

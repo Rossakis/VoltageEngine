@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
+using Nez.Editor;
 using Num = System.Numerics;
 
 namespace Nez.ImGuiTools;
@@ -46,10 +47,52 @@ public class SceneGraphWindow
 	private string _selectedTmxFile = null;
 	public static event Action<string> OnTmxFileSelected;
 
+	// Prefab caching
+	private List<string> _cachedPrefabNames = new();
+	private bool _prefabCacheInitialized = false;
+
+	// Prefab deletion
+	private bool _showDeletePrefabConfirmation = false;
+	private string _prefabToDelete = "";
+
 	public void OnSceneChanged()
 	{
 		_postProcessorsPane.OnSceneChanged();
 		_renderersPane.OnSceneChanged();
+	}
+
+	/// <summary>
+	/// Refreshes the prefab cache by scanning the prefabs directory.
+	/// Called on first use and when new prefabs are created.
+	/// </summary>
+	public void RefreshPrefabCache()
+	{
+		_cachedPrefabNames.Clear();
+		
+		var prefabsDirectory = "Content/Data/Prefabs";
+		if (Directory.Exists(prefabsDirectory))
+		{
+			var prefabFiles = Directory.GetFiles(prefabsDirectory, "*.json");
+			foreach (var file in prefabFiles)
+			{
+				var fileName = Path.GetFileNameWithoutExtension(file);
+				_cachedPrefabNames.Add(fileName);
+			}
+		}
+		
+		_prefabCacheInitialized = true;
+	}
+
+	/// <summary>
+	/// Adds a new prefab name to the cache without rescanning the directory.
+	/// Called when a new prefab is successfully created.
+	/// </summary>
+	public void AddPrefabToCache(string prefabName)
+	{
+		if (!_cachedPrefabNames.Contains(prefabName))
+		{
+			_cachedPrefabNames.Add(prefabName);
+		}
 	}
 
 	public void Show(ref bool isOpen)
@@ -77,6 +120,9 @@ public class SceneGraphWindow
 		ImGui.SetNextWindowSize(new Num.Vector2(_sceneGraphWidth, windowHeight), ImGuiCond.FirstUseEver);
 
 		var windowFlags = ImGuiWindowFlags.NoMove;
+
+		if(Input.IsKeyPressed(Keys.F5))
+			_imGuiManager.InvokeResetScene();
 
 		if (ImGui.Begin("Scene Graph", ref isOpen, windowFlags))
 		{
@@ -160,9 +206,15 @@ public class SceneGraphWindow
 			ImGui.PopStyleColor();
 		}
 
+		// Draw delete confirmation popup outside of the main window
+		// This ensures it appears on top of everything
+		if (_showDeletePrefabConfirmation)
+		{
+			DrawDeletePrefabConfirmationPopup();
+		}
+
 		HandleEntitySelectionNavigation();
 	}
-
 
 	private void DrawEntitySelectorPopup()
 	{
@@ -171,45 +223,340 @@ public class SceneGraphWindow
 			ImGui.InputText("###EntityFilter", ref _entityFilterName, 25);
 			ImGui.Separator();
 
+			// Initialize prefab cache if not done yet
+			if (!_prefabCacheInitialized)
+			{
+				RefreshPrefabCache();
+			}
+
+			// Draw Entity Factory Types
+			ImGui.TextColored(new Num.Vector4(0.8f, 0.8f, 1.0f, 1.0f), "Entity Types:");
 			foreach (var typeName in EntityFactoryRegistry.GetRegisteredTypes())
+			{
 				if (string.IsNullOrEmpty(_entityFilterName) ||
 				    typeName.ToLower().Contains(_entityFilterName.ToLower()))
+				{
 					if (ImGui.Selectable(typeName))
 					{
-						// Generate a unique name for the new entity
-						var uniqueName = Core.Scene.GetUniqueEntityName(typeName);
+						CreateEntityFromFactory(typeName);
+						ImGui.CloseCurrentPopup();
+					}
+				}
+			}
 
-						if (EntityFactoryRegistry.TryCreate(typeName, out var entity))
+			// Draw Prefabs (if any exist)
+			if (_cachedPrefabNames.Count > 0)
+			{
+				ImGui.Separator();
+				ImGui.TextColored(new Num.Vector4(1.0f, 0.6f, 0.2f, 1.0f), "Prefabs:");
+				
+				foreach (var prefabName in _cachedPrefabNames)
+				{
+					if (string.IsNullOrEmpty(_entityFilterName) ||
+					    prefabName.ToLower().Contains(_entityFilterName.ToLower()))
+					{
+						// Use selectable with right-click context menu
+						bool isClicked = ImGui.Selectable($"{prefabName} [Prefab]");
+						
+						// Handle left-click to create prefab
+						if (isClicked && ImGui.IsMouseClicked(ImGuiMouseButton.Left))
 						{
-							EntityFactoryRegistry.InvokeEntityCreated(entity);
-							entity.Type = Entity.InstanceType.Dynamic;
-							entity.Name = uniqueName;
-							entity.Transform.Position = Core.Scene.Camera.Transform.Position;
-
-							// Undo/Redo support for entity creation
-							EditorChangeTracker.PushUndo(
-								new EntityCreateDeleteUndoAction(Core.Scene, entity, wasCreated: true,
-									$"Create Entity {entity.Name}"),
-								entity,
-								$"Create Entity {entity.Name}"
-							);
-
-							// Optionally select and open inspector
-							var imGuiManager = Core.GetGlobalManager<ImGuiManager>();
-							if (imGuiManager != null)
-							{
-								imGuiManager.SceneGraphWindow.EntityPane.SelectedEntity = entity;
-								_imGuiManager.MainEntityInspector.DelayedSetEntity(entity);
-							}
-
+							CreateEntityFromPrefab(prefabName);
 							ImGui.CloseCurrentPopup();
 						}
+						
+						// Handle right-click for context menu
+						if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
+						{
+							ImGui.OpenPopup($"prefab-context-{prefabName}");
+						}
+						
+						// Draw context menu for this prefab
+						if (ImGui.BeginPopup($"prefab-context-{prefabName}"))
+						{
+							if (ImGui.Selectable("Create from Prefab"))
+							{
+								CreateEntityFromPrefab(prefabName);
+								ImGui.CloseCurrentPopup();
+							}
+							
+							ImGui.Separator();
+							
+							if (ImGui.Selectable("Delete Prefab"))
+							{
+								_prefabToDelete = prefabName;
+								_showDeletePrefabConfirmation = true;
+								ImGui.CloseCurrentPopup();
+							}
+							
+							ImGui.EndPopup();
+						}
 					}
+				}
+			}
+
+			ImGui.EndPopup();
+		}
+		
+		// Draw delete confirmation popup outside of the entity selector
+		DrawDeletePrefabConfirmationPopup();
+	}
+
+	/// <summary>
+	/// Draws the delete prefab confirmation popup.
+	/// </summary>
+	private void DrawDeletePrefabConfirmationPopup()
+	{
+		if (_showDeletePrefabConfirmation)
+		{
+			ImGui.OpenPopup("delete-prefab-confirmation");
+			_showDeletePrefabConfirmation = false; // Only open once
+		}
+
+		// Center the popup when it first appears
+		var center = new Num.Vector2(Screen.Width * 0.5f, Screen.Height * 0.4f);
+		ImGui.SetNextWindowPos(center, ImGuiCond.Appearing, new Num.Vector2(0.5f, 0.5f));
+
+		bool open = true;
+		if (ImGui.BeginPopupModal("delete-prefab-confirmation", ref open, ImGuiWindowFlags.AlwaysAutoResize))
+		{
+			ImGui.Text("Delete Prefab");
+			ImGui.Separator();
+			
+			ImGui.TextWrapped($"Are you sure you want to delete the '{_prefabToDelete}' prefab completely?");
+			ImGui.TextColored(new Num.Vector4(1.0f, 0.6f, 0.2f, 1.0f), "This action cannot be undone!");
+
+			NezImGui.MediumVerticalSpace();
+
+			// Center the buttons
+			var buttonWidth = 80f;
+			var spacing = 10f;
+			var totalButtonWidth = (buttonWidth * 2) + spacing;
+			var windowWidth = ImGui.GetWindowSize().X;
+			var centerStart = (windowWidth - totalButtonWidth) * 0.5f;
+			
+			ImGui.SetCursorPosX(centerStart);
+			
+			if (ImGui.Button("Yes", new Num.Vector2(buttonWidth, 0)))
+			{
+				DeletePrefab(_prefabToDelete);
+				ImGui.CloseCurrentPopup();
+			}
+			
+			ImGui.SameLine();
+			
+			if (ImGui.Button("No", new Num.Vector2(buttonWidth, 0)))
+			{
+				ImGui.CloseCurrentPopup();
+			}
 
 			ImGui.EndPopup();
 		}
 	}
 
+	/// <summary>
+	/// Deletes a prefab file and updates the prefab cache.
+	/// </summary>
+	/// <param name="prefabName">Name of the prefab to delete</param>
+	private void DeletePrefab(string prefabName)
+	{
+		try
+		{
+			// Construct paths to both the source and output prefab files
+			var sourceFilePath = $"{Environment.CurrentDirectory}/Content/Data/Prefabs/{prefabName}.json";
+			var outputFilePath = $"Content/Data/Prefabs/{prefabName}.json";
+
+			bool fileDeleted = false;
+
+			// Delete the source file if it exists
+			if (File.Exists(sourceFilePath))
+			{
+				File.Delete(sourceFilePath);
+				fileDeleted = true;
+			}
+
+			// Delete the output file if it exists
+			if (File.Exists(outputFilePath))
+			{
+				File.Delete(outputFilePath);
+				fileDeleted = true;
+			}
+
+			if (fileDeleted)
+			{
+				// Remove from cache
+				_cachedPrefabNames.Remove(prefabName);
+				
+				NotificationSystem.ShowTimedNotification($"Successfully deleted prefab: {prefabName}");
+			}
+			else
+			{
+				NotificationSystem.ShowTimedNotification($"Prefab file not found: {prefabName}");
+			}
+		}
+		catch (Exception ex)
+		{
+			NotificationSystem.ShowTimedNotification($"Failed to delete prefab {prefabName}: {ex.Message}");
+		}
+	}
+
+	/// <summary>
+	/// Removes a prefab name from the cache without rescanning the directory.
+	/// Called when a prefab is successfully deleted.
+	/// </summary>
+	public void RemovePrefabFromCache(string prefabName)
+	{
+		_cachedPrefabNames.Remove(prefabName);
+	}
+
+	private void DrawTmxFilePickerPopup()
+	{
+		bool isOpen = true;
+		if (ImGui.BeginPopupModal("tmx-file-picker", ref isOpen, ImGuiWindowFlags.AlwaysAutoResize))
+		{
+			var picker = FilePicker.GetFilePicker(this, Path.Combine(Environment.CurrentDirectory, "Content"), ".tmx");
+			picker.DontAllowTraverselBeyondRootFolder = true;
+			if (picker.Draw())
+			{
+				var file = picker.SelectedFile;
+				if (file.EndsWith(".tmx"))
+				{
+					string fullPath = file;
+					string contentRoot = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, "Content"));
+
+					if (fullPath.StartsWith(contentRoot, StringComparison.OrdinalIgnoreCase))
+					{
+						string relativePath = "Content" + fullPath.Substring(contentRoot.Length).Replace('\\', '/');
+						HandleTmxFileSelected(relativePath);
+						ImGui.CloseCurrentPopup();
+					}
+					else
+					{
+						ImGui.Text("Selected file is not inside Content folder!");
+					}
+				}
+				else
+				{
+					ImGui.Text("Selected file is not a valid TMX file.");
+				}
+				FilePicker.RemoveFilePicker(this);
+			}
+			ImGui.EndPopup();
+		}
+	}
+
+	private void HandleTmxFileSelected(string relativePath)
+	{
+		_selectedTmxFile = relativePath;
+		OnTmxFileSelected?.Invoke(relativePath);
+	}
+
+	/// <summary>
+	/// Creates a new entity from a prefab.
+	/// </summary>
+	private void CreateEntityFromPrefab(string prefabName)
+	{
+		// Use the event system to load prefab data from the DataLoader
+		var prefabData = _imGuiManager.InvokePrefabLoadRequested(prefabName);
+		// if (prefabData == null)
+		// {
+		// 	NotificationSystem.ShowTimedNotification($"Failed to load prefab: {prefabName}");
+		// 	return;
+		// }
+
+		// Cast the returned object to the expected type
+		// We'll use reflection to access the properties since we can't reference the JoltMono types directly
+		var prefabDataType = prefabData.GetType();
+		var entityTypeProperty = prefabDataType.GetProperty("EntityType");
+		
+		if (entityTypeProperty == null)
+		{
+			NotificationSystem.ShowTimedNotification($"Invalid prefab data format for: {prefabName} - EntityType property not found");
+			return;
+		}
+
+		var entityTypeName = entityTypeProperty.GetValue(prefabData) as string;
+
+		if (string.IsNullOrEmpty(entityTypeName))
+		{
+			NotificationSystem.ShowTimedNotification($"Prefab {prefabName} has no entity type specified");
+			return;
+		}
+
+		// Generate a unique name for the new entity instance
+		var uniqueName = Core.Scene.GetUniqueEntityName(entityTypeName);
+
+		if (EntityFactoryRegistry.TryCreate(entityTypeName, out var entity))
+		{
+			EntityFactoryRegistry.InvokeEntityCreated(entity);
+			
+			// Set as dynamic instance (instantiated from prefab, but not a prefab itself)
+			entity.Type = Entity.InstanceType.Dynamic;
+			entity.Name = uniqueName;
+			entity.Transform.Position = Core.Scene.Camera.Transform.Position;
+
+			// Load the prefab data into the entity using the event system
+			_imGuiManager.InvokeLoadEntityData(entity, prefabData);
+
+			// Override the name with our unique name (LoadPredefinedEntityData sets it to prefab name)
+			entity.Name = uniqueName;
+
+			// Undo/Redo support for entity creation
+			EditorChangeTracker.PushUndo(
+				new EntityCreateDeleteUndoAction(Core.Scene, entity, wasCreated: true,
+					$"Create Entity from Prefab {entity.Name}"),
+				entity,
+				$"Create Entity from Prefab {entity.Name}"
+			);
+
+			// Select and open inspector
+			var imGuiManager = Core.GetGlobalManager<ImGuiManager>();
+			if (imGuiManager != null)
+			{
+				imGuiManager.SceneGraphWindow.EntityPane.SelectedEntity = entity;
+				_imGuiManager.MainEntityInspector.DelayedSetEntity(entity);
+			}
+
+			NotificationSystem.ShowTimedNotification($"Created entity from prefab: {prefabName}");
+		}
+		else
+		{
+			NotificationSystem.ShowTimedNotification($"Failed to create entity from prefab: {prefabName}. Entity type '{entityTypeName}' not registered.");
+		}
+	}
+
+	/// <summary>
+	/// Creates a new entity from the EntityFactoryRegistry.
+	/// </summary>
+	private void CreateEntityFromFactory(string typeName)
+	{
+		// Generate a unique name for the new entity
+		var uniqueName = Core.Scene.GetUniqueEntityName(typeName);
+
+		if (EntityFactoryRegistry.TryCreate(typeName, out var entity))
+		{
+			EntityFactoryRegistry.InvokeEntityCreated(entity);
+			entity.Type = Entity.InstanceType.Dynamic;
+			entity.Name = uniqueName;
+			entity.Transform.Position = Core.Scene.Camera.Transform.Position;
+
+			// Undo/Redo support for entity creation
+			EditorChangeTracker.PushUndo(
+				new EntityCreateDeleteUndoAction(Core.Scene, entity, wasCreated: true,
+					$"Create Entity {entity.Name}"),
+				entity,
+				$"Create Entity {entity.Name}"
+			);
+
+			// Optionally select and open inspector
+			var imGuiManager = Core.GetGlobalManager<ImGuiManager>();
+			if (imGuiManager != null)
+			{
+				imGuiManager.SceneGraphWindow.EntityPane.SelectedEntity = entity;
+				_imGuiManager.MainEntityInspector.DelayedSetEntity(entity);
+			}
+		}
+	}
 
 	#region Entity Selection Navigation
 	private void HandleEntitySelectionNavigation()
@@ -385,47 +732,5 @@ public class SceneGraphWindow
 		}
 	}
 
-#endregion
-
-	private void DrawTmxFilePickerPopup()
-	{
-		bool isOpen = true;
-		if (ImGui.BeginPopupModal("tmx-file-picker", ref isOpen, ImGuiWindowFlags.AlwaysAutoResize))
-		{
-			var picker = FilePicker.GetFilePicker(this, Path.Combine(Environment.CurrentDirectory, "Content"), ".tmx");
-			picker.DontAllowTraverselBeyondRootFolder = true;
-			if (picker.Draw())
-			{
-				var file = picker.SelectedFile;
-				if (file.EndsWith(".tmx"))
-				{
-					string fullPath = file;
-					string contentRoot = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, "Content"));
-
-					if (fullPath.StartsWith(contentRoot, StringComparison.OrdinalIgnoreCase))
-					{
-						string relativePath = "Content" + fullPath.Substring(contentRoot.Length).Replace('\\', '/');
-						HandleTmxFileSelected(relativePath);
-						ImGui.CloseCurrentPopup();
-					}
-					else
-					{
-						ImGui.Text("Selected file is not inside Content folder!");
-					}
-				}
-				else
-				{
-					ImGui.Text("Selected file is not a valid TMX file.");
-				}
-				FilePicker.RemoveFilePicker(this);
-			}
-			ImGui.EndPopup();
-		}
-	}
-
-	private void HandleTmxFileSelected(string relativePath)
-	{
-		_selectedTmxFile = relativePath;
-		OnTmxFileSelected?.Invoke(relativePath);
-	}
+	#endregion
 }

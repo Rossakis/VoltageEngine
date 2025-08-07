@@ -340,4 +340,31 @@ public class ComponentList : IEnumerable<Component>
 	}
 
 	#endregion
+
+	/// <summary>
+	/// Gets the first component of type T with the specified name and returns it. If no component is found returns null.
+	/// </summary>
+	/// <returns>The component.</returns>
+	/// <param name="name">Name of the component to find.</param>
+	/// <typeparam name="T">The component type.</typeparam>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public T GetComponent<T>(string name) where T : class
+	{
+		for (var i = 0; i < _components.Length; i++)
+		{
+			var component = _components.Buffer[i];
+			if (component is T && component.Name == name)
+				return component as T;
+		}
+
+		// we also check the pending components just in case addComponent and getComponent are called in the same frame
+		for (var i = 0; i < _componentsToAdd.Count; i++)
+		{
+			var component = _componentsToAdd[i];
+			if (component is T && component.Name == name)
+				return component as T;
+		}
+
+		return null;
+	}
 }

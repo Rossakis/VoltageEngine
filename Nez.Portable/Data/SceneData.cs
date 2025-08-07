@@ -42,7 +42,6 @@ public class SceneData
             Position = Vector2.Zero;
             Rotation = 0f;
             Scale = Vector2.One;
-            EntityData = null;
             Enabled = true;
             UpdateOrder = 0;
             Tag = 0;

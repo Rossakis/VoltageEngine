@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Nez.Data;
 using Num = System.Numerics;
 
 
@@ -92,6 +93,9 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	public event Func<Task> OnSaveSceneAsync;
 	public event Action OnResetScene;
 	public event Action<bool> OnSwitchEditMode;
+	public event Func<Entity, Task<bool>> OnPrefabCreated;
+	public event Func<string, SceneData.SceneEntityData> OnPrefabLoadRequested;
+	public event Action<Entity, object> OnLoadEntityData; // Add this for loading entity data
 
 
 	public void InvokeSaveSceneChanges()
@@ -109,6 +113,28 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		OnSwitchEditMode?.Invoke(isEditMode);
 	}
 
+	public async Task<bool> InvokePrefabCreated(Entity prefabEntity)
+	{
+		if (OnPrefabCreated != null)
+		{
+			return await OnPrefabCreated.Invoke(prefabEntity);
+		}
+		return false;
+	}
+
+	public SceneData.SceneEntityData InvokePrefabLoadRequested(string prefabName)
+	{
+		if (OnPrefabLoadRequested != null)
+		{
+			return OnPrefabLoadRequested.Invoke(prefabName);
+		}
+		return new SceneData.SceneEntityData();
+	}
+
+	public void InvokeLoadEntityData(Entity entity, object entityData)
+	{
+		OnLoadEntityData?.Invoke(entity, entityData);
+	}
 	#endregion
 
 	public ImGuiManager(ImGuiOptions options = null)

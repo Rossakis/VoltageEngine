@@ -246,11 +246,26 @@ public class EntityPane
 
         bool isSelected = entity == _selectedEntity;
         ImGui.PushID((int)entity.Id);
-        bool treeNodeOpened;
+        bool treeNodeOpened = false;
         var flags = isSelected ? ImGuiTreeNodeFlags.Selected : 0;
         bool isExpanded = _imGuiManager.SceneGraphWindow.ExpandedEntities.Contains(entity);
         if (entity.Transform.ChildCount > 0)
             ImGui.SetNextItemOpen(isExpanded, ImGuiCond.Always);
+
+		// Set special color for entities based on type
+		bool isPrefab = entity.Type == Entity.InstanceType.Prefab;
+		bool isHardCoded = entity.Type == Entity.InstanceType.HardCoded;
+
+		if (isPrefab)
+		{
+			// Orange color for prefab entities
+			ImGui.PushStyleColor(ImGuiCol.Text, new System.Numerics.Vector4(1.0f, 0.6f, 0.2f, 1.0f));
+		}
+		else if (isHardCoded)
+		{
+			// Green color for hardcoded entities
+			ImGui.PushStyleColor(ImGuiCol.Text, new System.Numerics.Vector4(0.2f, 1.0f, 0.2f, 1.0f));
+		}
 
 		// Draw tree node
 		if (entity.Transform.ChildCount > 0)
@@ -259,6 +274,13 @@ public class EntityPane
 		else
 			treeNodeOpened = ImGui.TreeNodeEx($"{entity.Name} ({entity.Transform.ChildCount})###{entity.Id}",
 				ImGuiTreeNodeFlags.Leaf | ImGuiTreeNodeFlags.OpenOnArrow | flags);
+
+		// Pop the color style if we pushed it
+		if (isPrefab || isHardCoded)
+		{
+			ImGui.PopStyleColor();
+		}
+
 
 		if (entity.Transform.ChildCount > 0)
 		{
@@ -461,7 +483,9 @@ public class EntityPane
 	            _selectedEntity,
 	            $"Deleted: {_selectedEntity.Name}"
 	        );
-	        _selectedEntity.DetachFromScene();
+	        
+	        // Use Destroy() instead of DetachFromScene() to properly clean up components
+	        _selectedEntity.Destroy();
 	        SelectedEntity = null;
 	    }
 	}
@@ -470,112 +494,82 @@ public class EntityPane
 	/// Duplicates the given entity and adds it to the scene.
 	/// If the entity is HardCoded, the clone will be of type Dynamic.
 	/// </summary>
-	private void DuplicateEntity(Entity entity)
+	public Entity DuplicateEntity(Entity entity, string customName = null, Entity.InstanceType type = Entity.InstanceType.Dynamic)
     {
 	    if (entity == null || entity.Scene == null)
-		    return;
+		    return null;
 
 		var typeName = entity.GetType().Name;
 	    if (EntityFactoryRegistry.TryCreate(typeName, out var clone))
 	    {
-		    clone.OnComponentAdded<Component>(comp =>
-		    {
-			    // System.Console.WriteLine($"{comp.Name} was added to {clone.Name}");
-			    clone.CopyEntityFrom(entity);
-		    });
+		    // Set up the clone with basic properties first
+		    clone.Name = customName ?? Core.Scene.GetUniqueEntityName(entity.Name);
+		    clone.Type = type;
+		    clone.Transform.Position = entity.Transform.Position;
+		    clone.Transform.Rotation = entity.Rotation;
+		    clone.Transform.Scale = entity.Scale;
+		    clone.SetTag(entity.Tag);
+		    clone.Enabled = entity.Enabled;
+		    clone.DebugRenderEnabled = entity.DebugRenderEnabled;
+		    clone.UpdateInterval = entity.UpdateInterval;
+		    clone.UpdateOrder = entity.UpdateOrder;
 
-			clone.OnChildAdded<Entity>(ent =>
+		    // Copy all components directly without using callbacks
+		    foreach (var sourceComponent in entity.Components)
 		    {
-			    for (var i = 0; i < clone.Transform.ChildCount; i++)
+			    // Remove any existing component of the same type and name
+			    var existingComponent = clone.Components.FirstOrDefault(c => c.GetType() == sourceComponent.GetType() && c.Name == sourceComponent.Name);
+			    if (existingComponent != null)
 			    {
-				    if (entity.Transform.GetChild(i).Entity.Name == ent.Name)
-				    {
-					    // System.Console.WriteLine($"{ent.Name} copied from {entity.Transform.GetChild(i).Entity.Name}");
-					    ent.CopyEntityFrom(entity.Transform.GetChild(i).Entity);
-				    }
+				    clone.RemoveComponent(existingComponent);
 			    }
-		    });
 
-			EntityFactoryRegistry.InvokeEntityCreated(clone);
+			    // Clone and add the component
+			    var clonedComponent = sourceComponent.Clone();
+			    clone.AddComponent(clonedComponent);
+		    }
 
-			// Undo/Redo support for entity creation
-			EditorChangeTracker.PushUndo(
+
+		    // Invoke entity creation to add to scene
+		    EntityFactoryRegistry.InvokeEntityCreated(clone);
+
+		    // Copy children if any exist, but SKIP HardCoded entities
+		    for (var i = 0; i < entity.Transform.ChildCount; i++)
+		    {
+			    var childEntity = entity.Transform.GetChild(i).Entity;
+			    
+			    // Skip HardCoded children - they should be created by the parent entity's initialization logic
+			    if (childEntity.Type == Entity.InstanceType.HardCoded)
+			    {
+				    continue;
+			    }
+			    
+			    // Only duplicate Dynamic and Prefab children
+			    var clonedChild = DuplicateEntity(childEntity, null, type);
+			    if (clonedChild != null)
+			    {
+				    clonedChild.Transform.SetParent(clone.Transform);
+			    }
+		    }
+
+		    // Undo/Redo support for entity creation
+		    EditorChangeTracker.PushUndo(
                 new EntityCreateDeleteUndoAction(entity.Scene, clone, wasCreated: true, $"Created: Entity {clone.Name}"),
                 clone,
                 $"Created: {clone.Name}"
             );
 
-			//Manually set the entity data to ensure it is cloned correctly
-			clone.RemoveComponent<EntityData>();
-			clone.AddComponent(entity.GetComponent<EntityData>()?.Clone() ?? new EntityData());
-
-			SelectedEntity = clone;
+		    SelectedEntity = clone;
             _imGuiManager.MainEntityInspector.DelayedSetEntity(clone);
-		}
+            
+            return clone;
+	    }
 		else
 	    {
 		    throw new InvalidOperationException(
 			    $"EntityFactoryRegistry: Entity type '{typeName}' is not registered in the factory. " +
 			    $"Did you forget to call EntityFactoryRegistry.Register(\"{typeName}\", ...)?");
 	    }
-
-	}
-
-	private IEnumerator MarkDelayed(Entity entity, float time)
-	{
-		yield return Coroutine.WaitForSeconds(time);
-		entity.AttachToScene(Core.Scene);
-	}
-
-	public void CopyComponentValues(Entity originalEntity, Component targetComponent)
-	{
-		if (targetComponent == null)
-			throw new ArgumentNullException(nameof(targetComponent));
-
-		// Find the matching component on this entity by type and name
-		var sourceComponent = originalEntity.Components.FirstOrDefault(c => c.GetType() == targetComponent.GetType() && c.Name == targetComponent.Name);
-
-		if (sourceComponent == null)
-			return;
-
-		var type = sourceComponent.GetType();
-
-		// Copy all public instance properties with both getter and setter
-		foreach (var prop in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
-		{
-			if (!prop.CanRead || !prop.CanWrite)
-				continue;
-
-			if (!prop.GetSetMethod()!.IsPublic || !prop.GetGetMethod()!.IsPublic)
-				continue;
-
-			if (prop.GetIndexParameters().Length > 0) // Skip indexers
-				continue;
-
-			try
-			{
-				var value = prop.GetValue(sourceComponent);
-				prop.SetValue(targetComponent, value);
-			}
-			catch
-			{
-				// Ignore property if it fails to set
-			}
-		}
-
-		// Copy all public instance fields
-		foreach (var field in type.GetFields(BindingFlags.Public | BindingFlags.Instance))
-		{
-			try
-			{
-				var value = field.GetValue(sourceComponent);
-				field.SetValue(targetComponent, value);
-			}
-			catch
-			{
-				// Ignore field if it fails to set 
-			}
-		}
 	}
 	#endregion
 

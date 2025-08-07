@@ -265,14 +265,6 @@ public class EntityInspector
 				NezImGui.MediumVerticalSpace();
 			}
 
-			if (NezImGui.CenteredButton("Add Component", 0.6f))
-			{
-				_componentNameFilter = "";
-				ImGui.OpenPopup("component-selector");
-			}
-
-			DrawComponentSelectorPopup();
-
 			ImGui.End();
 		}
 
@@ -280,14 +272,7 @@ public class EntityInspector
 			_imGuiManager.CloseEntityInspector(this);
 	}
 
-	private void DrawComponentSelectorPopup()
-	{
-		if (Entity == null)
-			return;
-
-		DrawComponentSelector(Entity, _componentNameFilter);
-	}
-
+	[Obsolete]
 	public static void DrawComponentSelector(Entity entity, string componentNameFilter)
 	{
 		if (ImGui.BeginPopup("component-selector"))

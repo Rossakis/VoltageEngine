@@ -1,4 +1,5 @@
-﻿using Nez.PhysicsShapes;
+﻿using System.Linq;
+using Nez.PhysicsShapes;
 
 
 namespace Nez
@@ -53,7 +54,7 @@ namespace Nez
 		{
 			_colliderRequiresAutoSizing = false;
 			var circle = Shape as Circle;
-			if (radius != circle.Radius)
+			if (circle != null && radius != circle.Radius)
 			{
 				circle.Radius = radius;
 				circle.OriginalRadius = radius;
@@ -82,6 +83,63 @@ namespace Nez
 		public string PrintBounds()
 		{
 			return string.Format("[CircleCollider: bounds: {0}, radius: {1}", Bounds, ((Circle) Shape).Radius);
+		}
+
+
+		/// <summary>
+		/// Creates a deep clone of this CircleCollider component.
+		/// </summary>
+		/// <returns>A new CircleCollider instance with all properties deep-copied</returns>
+		public override Component Clone()
+		{
+			var clone = new CircleCollider();
+			
+			// Copy all base Collider properties
+			clone.IsTrigger = IsTrigger;
+			clone.PhysicsLayer = PhysicsLayer;
+			clone.CollidesWithLayers = CollidesWithLayers;
+			clone.ShouldColliderScaleAndRotateWithTransform = ShouldColliderScaleAndRotateWithTransform;
+			clone.LocalOffset = LocalOffset;
+			clone.Enabled = Enabled;
+			clone.Name = Name;
+			
+			// Copy CircleCollider-specific properties
+			clone.Radius = Radius;
+			
+			// Deep clone the Shape
+			if (Shape != null)
+			{
+				clone.Shape = Shape.Clone();
+			}
+			
+			// Copy internal state flags
+			clone._colliderRequiresAutoSizing = _colliderRequiresAutoSizing;
+			clone._localOffsetLength = _localOffsetLength;
+			
+			// Reset entity-specific state (the clone isn't attached to any entity yet)
+			clone.Entity = null;
+			clone._isParentEntityAddedToScene = false;
+			clone._isColliderRegistered = false;
+			clone._isPositionDirty = true;
+			clone._isRotationDirty = true;
+			
+			// Copy the component data
+			if (Data != null && Data is Collider.ColliderComponentData colliderData)
+			{
+				clone.Data = new Collider.ColliderComponentData
+				{
+					IsTrigger = colliderData.IsTrigger,
+					PhysicsLayer = colliderData.PhysicsLayer,
+					CollidesWithLayers = colliderData.CollidesWithLayers,
+					ShouldColliderScaleAndRotateWithTransform = colliderData.ShouldColliderScaleAndRotateWithTransform,
+					Rectangle = colliderData.Rectangle,
+					CircleRadius = colliderData.CircleRadius,
+					CircleOffset = colliderData.CircleOffset,
+					PolygonPoints = colliderData.PolygonPoints?.ToArray() // Deep copy array if it exists
+				};
+			}
+			
+			return clone;
 		}
 	}
 }

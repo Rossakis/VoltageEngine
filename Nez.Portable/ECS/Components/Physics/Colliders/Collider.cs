@@ -123,7 +123,7 @@ namespace Nez
 		{
 			get
 			{
-				if (ShouldColliderScaleAndRotateWithTransform && Entity != null)
+				if (ShouldColliderScaleAndRotateWithTransform && Entity?.Transform != null)
 					return Entity.Transform.Rotation;
 
 				return 0;
@@ -201,12 +201,16 @@ namespace Nez
 		{
 			if (_localOffset != offset)
 			{
-				if(Enabled)
+				// Add null safety check
+				if (Enabled && Entity != null)
 					UnregisterColliderWithPhysicsSystem();
+				
 				_localOffset = offset;
 				_localOffsetLength = _localOffset.Length();
 				_isPositionDirty = true;
-				if(Enabled)
+				
+				// Add null safety check
+				if (Enabled && Entity != null)
 					RegisterColliderWithPhysicsSystem();
 			}
 
@@ -479,11 +483,34 @@ namespace Nez
 		public override Component Clone()
 		{
 			var collider = MemberwiseClone() as Collider;
+			
+			// Reset entity-specific state to ensure clean cloning
 			collider.Entity = null;
-
+			collider._isParentEntityAddedToScene = false;
+			collider._isColliderRegistered = false;
+			collider._isPositionDirty = true;
+			collider._isRotationDirty = true;
+			
+			// Deep clone the shape if it exists
 			if (Shape != null)
 				collider.Shape = Shape.Clone();
-
+			
+			// Create a fresh component data instance to avoid shared references
+			if (_data != null)
+			{
+				collider._data = new ColliderComponentData
+				{
+					IsTrigger = _data.IsTrigger,
+					PhysicsLayer = _data.PhysicsLayer,
+					CollidesWithLayers = _data.CollidesWithLayers,
+					ShouldColliderScaleAndRotateWithTransform = _data.ShouldColliderScaleAndRotateWithTransform,
+					Rectangle = _data.Rectangle,
+					CircleRadius = _data.CircleRadius,
+					CircleOffset = _data.CircleOffset,
+					PolygonPoints = _data.PolygonPoints?.ToArray() // Deep copy array
+				};
+			}
+			
 			return collider;
 		}
 	}
