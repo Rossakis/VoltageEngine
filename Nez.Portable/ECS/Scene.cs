@@ -993,6 +993,12 @@ public class Scene
 		return AddEntity(entity);
 	}
 
+	public Entity SimpleCreateEntity(string name)
+	{
+		var entity = new Entity(name);
+		return AddEntity(entity);
+	}
+
 	#region Wait for Entity Added 
 	/// <summary>
 	/// Registers a callback that will be invoked whenever an entity of type <typeparamref name="T"/> is added to the scene,
@@ -1113,7 +1119,10 @@ public class Scene
 	/// <param name="entity">The Entity to add</param>
 	public virtual Entity AddEntity(Entity entity)
 	{
-		AddEntity<Entity>(entity);
+        if (Entities.FindEntity(entity.Name) != null)
+            entity.Name = GetUniqueEntityName(entity.Name, entity);
+
+        AddEntity<Entity>(entity);
 		return entity;
 	}
 
@@ -1123,6 +1132,9 @@ public class Scene
 	/// <param name="entity">The Entity to add</param>
 	public virtual T AddEntity<T>(T entity) where T : Entity
 	{
+        if (Entities.FindEntity(entity.Name) != null)
+            entity.Name = GetUniqueEntityName(entity.Name, entity);
+
 		Entities.Add(entity);
 		entity.Scene = this;
 		for (var i = 0; i < entity.Transform.ChildCount; i++)
@@ -1203,36 +1215,71 @@ public class Scene
 	}
 
 	/// <summary>
-	/// Pattern: BaseName + optional separator + optional1 number at the end e.g. Platform, Platform_1, Platform-1, Platform1
+	/// Pattern: BaseName + optional separator + optional number at the end e.g. Platform, Platform_1, Platform-1, Platform1
 	/// </summary>
 	/// <param name="baseName"></param>
 	/// <returns></returns>
-	public string GetUniqueEntityName(string baseName)
+	public string GetUniqueEntityName(string baseName, Entity entity)
 	{
 		var baseLower = baseName.ToLower();
 
 		var allNames = new List<string>();
 		for (var i = 0; i < Entities.Count; i++)
-			allNames.Add(Entities[i].Name.ToLower());
+		{
+			if (Entities[i] == entity) // Don't compare with itself
+				continue;
 
-		// If baseName is available, return it
+			allNames.Add(Entities[i].Name.ToLower());
+		}
+
+		// If baseName is available, return it AS-IS without any modification
 		if (!allNames.Contains(baseLower))
 			return baseName;
 
-		// Match names like: entity, entity_1, entity-1, entity1
-		var pattern = @"^" + System.Text.RegularExpressions.Regex.Escape(baseLower) + @"(?:[_\-]?(\d+))?$";
-		var maxNum = 0;
+		// Extract the base name and starting number if the input already has a number
+		var inputPattern = @"^(.+?)[_\-]?(\d+)$";
+		var inputMatch = System.Text.RegularExpressions.Regex.Match(baseName, inputPattern);
+		
+		string actualBaseName;
+		int startingNumber;
+		
+		if (inputMatch.Success)
+		{
+			// Input already has a number, extract the base and number
+			actualBaseName = inputMatch.Groups[1].Value;
+			startingNumber = int.Parse(inputMatch.Groups[2].Value);
+		}
+		else
+		{
+			// Input has no number, start from 1
+			actualBaseName = baseName;
+			startingNumber = 1;
+		}
+
+		// Find the highest existing number for this base name
+		var baseNameLower = actualBaseName.ToLower();
+		var pattern = @"^" + System.Text.RegularExpressions.Regex.Escape(baseNameLower) + @"(?:[_\-]?(\d+))?$";
+		var maxNum = startingNumber - 1; // Start one below the input number
 
 		foreach (var name in allNames)
 		{
 			var match = System.Text.RegularExpressions.Regex.Match(name, pattern);
 			if (match.Success)
-				if (int.TryParse(match.Groups[1].Value, out var num))
-					if (num > maxNum)
-						maxNum = num;
+			{
+				if (string.IsNullOrEmpty(match.Groups[1].Value))
+				{
+					// This is the base name without a number
+					maxNum = Math.Max(maxNum, 0);
+				}
+				else if (int.TryParse(match.Groups[1].Value, out var num))
+				{
+					// This is a numbered variant
+					maxNum = Math.Max(maxNum, num);
+				}
+			}
 		}
 
-		return $"{baseName}_{maxNum + 1}";
+		return $"{actualBaseName}_{maxNum + 1}";
 	}
 
 	#endregion

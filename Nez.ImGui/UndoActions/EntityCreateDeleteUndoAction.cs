@@ -46,7 +46,7 @@ public class EntityCreateDeleteUndoAction : EditorChangeTracker.IEditorAction
 		{
 			EntityFactoryRegistry.InvokeEntityCreated(clone);
 			clone.Type = Entity.InstanceType.Dynamic;
-			clone.Name = Core.Scene.GetUniqueEntityName(typeName);
+			clone.Name = Core.Scene.GetUniqueEntityName(typeName, clone);
 			clone.Transform.Position = entity.Transform.Position;
 			clone.Transform.Rotation = entity.Rotation;
 			clone.Transform.Scale = entity.Scale;

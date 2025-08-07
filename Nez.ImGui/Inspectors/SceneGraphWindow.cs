@@ -484,7 +484,7 @@ public class SceneGraphWindow
 		}
 
 		// Generate a unique name for the new entity instance
-		var uniqueName = Core.Scene.GetUniqueEntityName(entityTypeName);
+		var uniqueName = Core.Scene.GetUniqueEntityName(entityTypeName, null); 
 
 		if (EntityFactoryRegistry.TryCreate(entityTypeName, out var entity))
 		{
@@ -492,7 +492,7 @@ public class SceneGraphWindow
 			
 			// Set as dynamic instance (instantiated from prefab, but not a prefab itself)
 			entity.Type = Entity.InstanceType.Dynamic;
-			entity.Name = uniqueName;
+			entity.Name = Core.Scene.GetUniqueEntityName(entityTypeName, entity);
 			entity.Transform.Position = Core.Scene.Camera.Transform.Position;
 
 			// Load the prefab data into the entity using the event system
@@ -530,14 +530,11 @@ public class SceneGraphWindow
 	/// </summary>
 	private void CreateEntityFromFactory(string typeName)
 	{
-		// Generate a unique name for the new entity
-		var uniqueName = Core.Scene.GetUniqueEntityName(typeName);
-
 		if (EntityFactoryRegistry.TryCreate(typeName, out var entity))
 		{
 			EntityFactoryRegistry.InvokeEntityCreated(entity);
 			entity.Type = Entity.InstanceType.Dynamic;
-			entity.Name = uniqueName;
+			entity.Name = Core.Scene.GetUniqueEntityName(typeName, entity); 
 			entity.Transform.Position = Core.Scene.Camera.Transform.Position;
 
 			// Undo/Redo support for entity creation

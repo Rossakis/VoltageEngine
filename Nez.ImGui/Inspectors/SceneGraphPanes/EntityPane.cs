@@ -503,7 +503,7 @@ public class EntityPane
 	    if (EntityFactoryRegistry.TryCreate(typeName, out var clone))
 	    {
 		    // Set up the clone with basic properties first
-		    clone.Name = customName ?? Core.Scene.GetUniqueEntityName(entity.Name);
+		    clone.Name = customName ?? Core.Scene.GetUniqueEntityName(entity.Name, entity);
 		    clone.Type = type;
 		    clone.Transform.Position = entity.Transform.Position;
 		    clone.Transform.Rotation = entity.Rotation;

@@ -144,12 +144,11 @@ public class MainEntityInspector
 						_nameEditStartValue = Entity.Name;
 					}
 
-					if (changed)
-						Entity.Name = name;
-
 					if (_isEditingName && ImGui.IsItemDeactivatedAfterEdit())
 					{
 						_isEditingName = false;
+						Entity.Name = name; 
+						
 						if (Entity.Name != _nameEditStartValue)
 						{
 							EditorChangeTracker.PushUndo(

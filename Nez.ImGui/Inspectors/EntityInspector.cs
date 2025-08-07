@@ -104,11 +104,13 @@ public class EntityInspector
 				}
 
 				if (changed)
-					Entity.Name = name;
+					Entity.Name = name; // This will automatically ensure uniqueness
 
 				if (_isEditingName && ImGui.IsItemDeactivatedAfterEdit())
 				{
 					_isEditingName = false;
+					Entity.Name = name;
+
 					if (Entity.Name != _nameEditStartValue)
 					{
 						EditorChangeTracker.PushUndo(

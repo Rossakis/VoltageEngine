@@ -32,9 +32,9 @@ public class SceneData
         public int UpdateOrder;
         public int Tag;
         public bool DebugRenderEnabled;
-        public string ParentEntityName = null;
+        public string ParentEntityName;
 
-		public SceneEntityData()
+        public SceneEntityData()
         {
             InstanceType = Entity.InstanceType.HardCoded;
             Name = "";
@@ -42,10 +42,12 @@ public class SceneData
             Position = Vector2.Zero;
             Rotation = 0f;
             Scale = Vector2.One;
+            EntityData = new EntityData();
             Enabled = true;
             UpdateOrder = 0;
             Tag = 0;
             DebugRenderEnabled = true;
+            ParentEntityName = null;
         }
     }
 
@@ -60,7 +62,7 @@ public class SceneData
         return new T();
     }
 
-    public Entity GetEntity(Nez.Scene scene, string name)
+    public Entity GetEntity(Scene scene, string name)
     {
         for (var i = 0; i < scene.Entities.Count; i++)
             foreach (var entity in Entities)

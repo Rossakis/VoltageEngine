@@ -50,7 +50,21 @@ public class Entity : IComparable<Entity>
 	/// <summary>
 	/// entity name. useful for doing scene-wide searches for an entity
 	/// </summary>
-	public string Name;
+	public string Name
+	{
+		get => _name;
+		set
+		{
+			if (Scene != null)
+			{
+				_name = Scene.GetUniqueEntityName(value, this);
+			}
+			else
+			{
+				_name = value;
+			}
+		}
+	}
 
 	/// <summary>
 	/// unique identifer for this Entity
@@ -124,7 +138,7 @@ public class Entity : IComparable<Entity>
 	private bool _enabled = true;
 	private bool _debugRenderEnabled = true;
 	internal int _updateOrder = 0;
-
+	private string _name;
 
 	#region Serialization data structs
 	private readonly Dictionary<Type, List<Delegate>> _componentAddedCallbacks = new();
@@ -272,7 +286,7 @@ public class Entity : IComparable<Entity>
 	{
 		Components = new ComponentList(this);
 		Transform = new Transform(this);
-		Name = name;
+		_name = name; 
 		Id = _idGenerator++;
 		DebugRenderEnabled = Core.DebugRenderEnabled;
 	}
@@ -424,7 +438,7 @@ public class Entity : IComparable<Entity>
 		if(customName != null)
 			Name = customName;
 		else
-			Name = Core.Scene.GetUniqueEntityName(entity.Name);
+			Name = Core.Scene.GetUniqueEntityName(entity.Name, entity);
 
 		Type = type;
 		Transform.Position = entity.Transform.Position;
