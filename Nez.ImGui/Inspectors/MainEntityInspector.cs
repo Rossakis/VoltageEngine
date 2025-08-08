@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.IO;
 using Nez.Editor;
+using Nez.Persistence;
 using Num = System.Numerics;
 
 namespace Nez.ImGuiTools;
@@ -36,6 +37,10 @@ public class MainEntityInspector
 	// Prefab creation popup fields
 	private string _prefabName = "";
 	private ImGuiManager _imguiManager;
+
+	// Prefab apply confirmation popup fields
+	private bool _showApplyToPrefabCopiesConfirmation = false;
+	private List<Entity> _prefabCopiesToModify = new();
 
 	public MainEntityInspector(Entity entity = null)
 	{
@@ -127,6 +132,13 @@ public class MainEntityInspector
 				// Draw main entity UI
 				var type = Entity.Type.ToString();
 				ImGui.InputText("InstanceType", ref type, 30);
+
+				// Show OriginalPrefabName for Prefab entities (readonly)
+				if (Entity.Type == Entity.InstanceType.Prefab && !string.IsNullOrEmpty(Entity.OriginalPrefabName))
+				{
+					var originalPrefabName = Entity.OriginalPrefabName;
+					ImGui.InputText("Original Prefab Name", ref originalPrefabName, 50, ImGuiInputTextFlags.ReadOnly);
+				}
 
 				// Enabled
 				{
@@ -306,8 +318,20 @@ public class MainEntityInspector
 					_prefabName = Entity.Name + "_Prefab";
 					ImGui.OpenPopup("prefab-creator");
 				}
+
+				// Add "Apply to Prefab Copies" button for prefab entities
+				if (Entity.Type == Entity.InstanceType.Prefab && !string.IsNullOrEmpty(Entity.OriginalPrefabName))
+				{
+					NezImGui.MediumVerticalSpace();
+					if (NezImGui.CenteredButton("Apply to Prefab Copies", 0.8f))
+					{
+						// Find prefab copies and show confirmation
+						ShowApplyToPrefabCopiesConfirmation();
+					}
+				}
 				
 				DrawPrefabCreatorPopup();
+				DrawApplyToPrefabCopiesConfirmationPopup(); // Add this new popup
 			}
 		}
 
@@ -405,7 +429,7 @@ public class MainEntityInspector
 			return;
 
 		// Use the existing DuplicateEntity method from EntityPane
-		var newPrefab = _imguiManager.SceneGraphWindow.EntityPane.DuplicateEntity(Entity, prefabName, Entity.InstanceType.Prefab);
+		var newPrefab = _imguiManager.SceneGraphWindow.EntityPane.DuplicateEntity(Entity, prefabName);
 		
 		if (newPrefab != null)
 		{
@@ -472,6 +496,120 @@ public class MainEntityInspector
 	}
 
 	/// <summary>
+	/// Applies the current prefab entity's component data to all other entities in the scene 
+	/// that have the same OriginalPrefabName.
+	/// </summary>
+	private void ApplyToPrefabCopies()
+	{
+		if (Entity == null || Entity.Type != Entity.InstanceType.Prefab || string.IsNullOrEmpty(Entity.OriginalPrefabName))
+			return;
+
+		// Use the pre-found list of prefab copies
+		var prefabCopies = _prefabCopiesToModify;
+		
+		if (prefabCopies.Count == 0)
+		{
+			NotificationSystem.ShowTimedNotification($"No other copies of prefab '{Entity.OriginalPrefabName}' found in scene.");
+			return;
+		}
+
+		// Create undo action to track all changes
+		var undoActions = new List<EditorChangeTracker.IEditorAction>();
+
+		foreach (var targetEntity in prefabCopies)
+		{
+			// Store the entity's old component data for undo
+			var oldComponentData = new Dictionary<string, ComponentData>();
+			foreach (var component in targetEntity.Components)
+			{
+				if (component.Data != null)
+				{
+					try
+					{
+						var jsonSettings = new JsonSettings
+						{
+							PrettyPrint = false,
+							TypeNameHandling = TypeNameHandling.Auto,
+							PreserveReferencesHandling = false
+						};
+						
+						// Deep clone the old data for undo
+						var json = Json.ToJson(component.Data, jsonSettings);
+						var clonedOldData = (ComponentData)Json.FromJson(json, component.Data.GetType());
+						oldComponentData[component.Name] = clonedOldData;
+					}
+					catch (Exception ex)
+					{
+						System.Console.WriteLine($"Failed to backup component data for undo: {component.Name} - {ex.Message}");
+					}
+				}
+			}
+
+			// Apply component data from source entity to target entity
+			bool hasChanges = false;
+			foreach (var sourceComponent in Entity.Components)
+			{
+				if (sourceComponent.Data == null)
+					continue;
+
+				// Find matching component in target entity
+				var targetComponent = targetEntity.Components.FirstOrDefault(c => 
+					c.GetType() == sourceComponent.GetType() && c.Name == sourceComponent.Name);
+
+				if (targetComponent != null)
+				{
+					try
+					{
+						var jsonSettings = new JsonSettings
+						{
+							PrettyPrint = false,
+							TypeNameHandling = TypeNameHandling.Auto,
+							PreserveReferencesHandling = false
+						};
+						
+						// Deep clone the source component data
+						var json = Json.ToJson(sourceComponent.Data, jsonSettings);
+						var clonedData = (ComponentData)Json.FromJson(json, sourceComponent.Data.GetType());
+						
+						// Apply the cloned data to the target component
+						targetComponent.Data = clonedData;
+						hasChanges = true;
+					}
+					catch (Exception ex)
+					{
+						System.Console.WriteLine($"Failed to copy component data: {sourceComponent.Name} - {ex.Message}");
+					}
+				}
+			}
+
+			// Only create undo action if there were actual changes
+			if (hasChanges)
+			{
+				undoActions.Add(new PrefabCopyUndoAction(targetEntity, oldComponentData, Entity.OriginalPrefabName));
+			}
+		}
+
+		// Create a composite undo action that can undo all changes at once
+		if (undoActions.Count > 0)
+		{
+			var compositeUndo = new CompositePrefabApplyUndoAction(undoActions, Entity.OriginalPrefabName);
+			EditorChangeTracker.PushUndo(
+				compositeUndo,
+				Entity,
+				$"Apply '{Entity.OriginalPrefabName}' to {undoActions.Count} copies"
+			);
+
+			NotificationSystem.ShowTimedNotification($"Applied prefab '{Entity.OriginalPrefabName}' to {undoActions.Count} copies.");
+		}
+		else
+		{
+			NotificationSystem.ShowTimedNotification($"No changes were applied - all copies are already up to date.");
+		}
+
+		_prefabCopiesToModify.Clear();
+	}
+
+	/// <summary>
 	/// Used when we're dealing with a newly loaded entity that might not be ready to be set immediately.
 	/// </summary>
 	/// <param name="entity"></param>
@@ -485,5 +623,105 @@ public class MainEntityInspector
 	{
 		yield return Coroutine.WaitForSeconds(time);
 		SetEntity(entity);
+	}
+
+	/// <summary>
+	/// Shows the confirmation popup for applying prefab changes to copies.
+	/// </summary>
+	private void ShowApplyToPrefabCopiesConfirmation()
+	{
+		if (Entity == null || Entity.Type != Entity.InstanceType.Prefab || string.IsNullOrEmpty(Entity.OriginalPrefabName))
+			return;
+
+		// Find all entities in the scene that share the same OriginalPrefabName
+		_prefabCopiesToModify = Core.Scene.Entities
+			.Where(e => e != Entity && // Don't include the source entity
+						e.Type == Entity.InstanceType.Prefab && 
+						e.OriginalPrefabName == Entity.OriginalPrefabName)
+			.ToList();
+
+		if (_prefabCopiesToModify.Count == 0)
+		{
+			NotificationSystem.ShowTimedNotification($"No other copies of prefab '{Entity.OriginalPrefabName}' found in scene.");
+			return;
+		}
+
+		_showApplyToPrefabCopiesConfirmation = true;
+	}
+
+	/// <summary>
+	/// Draws the apply to prefab copies confirmation popup.
+	/// </summary>
+	private void DrawApplyToPrefabCopiesConfirmationPopup()
+	{
+		if (_showApplyToPrefabCopiesConfirmation)
+		{
+			ImGui.OpenPopup("apply-to-prefab-copies-confirmation");
+			_showApplyToPrefabCopiesConfirmation = false; // Only open once
+		}
+
+		// Center the popup when it first appears
+		var center = new Num.Vector2(Screen.Width * 0.45f, Screen.Height * 0.45f);
+		ImGui.SetNextWindowPos(center, ImGuiCond.Appearing, new Num.Vector2(0.5f, 0.5f));
+		ImGui.SetNextWindowSize(new Num.Vector2(450, 0), ImGuiCond.Appearing);
+
+		bool open = true;
+		if (ImGui.BeginPopupModal("apply-to-prefab-copies-confirmation", ref open, ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoTitleBar))
+		{
+			ImGui.Text("Apply Changes to Prefab Copies");
+			ImGui.Separator();
+			
+			ImGui.TextWrapped($"You are going to change prefab values for these entities:");
+			
+			NezImGui.SmallVerticalSpace();
+			
+			// Show the list of entities that will be affected
+			ImGui.TextColored(new Num.Vector4(1.0f, 0.8f, 0.2f, 1.0f), $"Prefab: {Entity.OriginalPrefabName}");
+			ImGui.TextColored(new Num.Vector4(0.8f, 0.8f, 0.8f, 1.0f), $"Entities to be modified ({_prefabCopiesToModify.Count}):");
+
+			// Create a scrollable region for the entity list
+			if (ImGui.BeginChild("EntityList", new Num.Vector2(0, Math.Min(200, _prefabCopiesToModify.Count * 80 + 20)), true))
+			{
+				foreach (var prefabCopy in _prefabCopiesToModify)
+				{
+					ImGui.BulletText($"{prefabCopy.Name}");
+					ImGui.Dummy(new Num.Vector2(0, 2)); // spacing between items
+				}
+			}
+			ImGui.EndChild();
+
+			NezImGui.MediumVerticalSpace();
+			
+			ImGui.TextColored(new Num.Vector4(1.0f, 0.6f, 0.2f, 1.0f), "This action can be undone with Ctrl+Z");
+
+			NezImGui.MediumVerticalSpace();
+
+			// Center the buttons
+			var buttonWidth = 80f;
+			var spacing = 10f;
+			var totalButtonWidth = (buttonWidth * 2) + spacing;
+			var windowWidth = ImGui.GetWindowSize().X;
+			var centerStart = (windowWidth - totalButtonWidth) * 0.5f;
+			
+			ImGui.SetCursorPosX(centerStart);
+			
+			if (ImGui.Button("OK", new Num.Vector2(buttonWidth, 0)))
+			{
+				// Proceed with applying changes
+				ApplyToPrefabCopies();
+				ImGui.CloseCurrentPopup();
+			}
+			
+			ImGui.SameLine();
+			
+			if (ImGui.Button("Cancel", new Num.Vector2(buttonWidth, 0)))
+			{
+				// Clear the list and close popup
+				_prefabCopiesToModify.Clear();
+				ImGui.CloseCurrentPopup();
+			}
+
+			ImGui.EndPopup();
+		}
 	}
 }

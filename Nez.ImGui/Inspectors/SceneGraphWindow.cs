@@ -458,9 +458,6 @@ public class SceneGraphWindow
 			// Use the event system to load prefab data from the DataLoader
 			var prefabData = _imGuiManager.InvokePrefabLoadRequested(prefabName);
 
-			// Cast the returned object to the expected type
-			// We'll use reflection to access the properties since we can't reference the JoltMono types directly
-			
 			if (prefabData.EntityData == null)
 			{
 				NotificationSystem.ShowTimedNotification($"Null Prefab EntityData: {prefabName}");
@@ -485,6 +482,7 @@ public class SceneGraphWindow
 				_imGuiManager.InvokeLoadEntityData(entity, prefabData);
 
 				entity.Name = Core.Scene.GetUniqueEntityName(prefabData.Name, entity);
+				entity.OriginalPrefabName = prefabName; // Store the prefab name for later
 
 				// Undo/Redo support for entity creation
 				EditorChangeTracker.PushUndo(

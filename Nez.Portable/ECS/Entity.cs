@@ -66,6 +66,18 @@ public class Entity : IComparable<Entity>
 		}
 	}
 
+	public string OriginalPrefabName
+	{
+		get => _originalPrefabName;
+		set
+		{
+			if (Type != InstanceType.Prefab)
+				return;
+
+			_originalPrefabName = value;
+		}
+	}
+
 	/// <summary>
 	/// unique identifer for this Entity
 	/// </summary>
@@ -139,6 +151,7 @@ public class Entity : IComparable<Entity>
 	private bool _debugRenderEnabled = true;
 	internal int _updateOrder = 0;
 	private string _name;
+	private string _originalPrefabName;
 
 	#region Serialization data structs
 	private readonly Dictionary<Type, List<Delegate>> _componentAddedCallbacks = new();
@@ -438,6 +451,9 @@ public class Entity : IComparable<Entity>
 		Transform.Position = entity.Transform.Position;
 		Transform.Rotation = entity.Transform.Rotation;
 		Transform.Scale = entity.Transform.Scale;
+
+		if(Type == InstanceType.Prefab)
+			OriginalPrefabName = entity.OriginalPrefabName;
 
 		for (var i = 0; i < entity.Components.Count; i++)
 		{

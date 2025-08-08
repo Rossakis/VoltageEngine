@@ -33,6 +33,7 @@ public class SceneData
         public int Tag;
         public bool DebugRenderEnabled;
         public string ParentEntityName;
+		public string OriginalPrefabName;
 
         public SceneEntityData()
         {
@@ -48,6 +49,7 @@ public class SceneData
             Tag = 0;
             DebugRenderEnabled = true;
             ParentEntityName = null;
+            OriginalPrefabName = null;
         }
     }
 

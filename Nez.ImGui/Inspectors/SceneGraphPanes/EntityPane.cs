@@ -4,14 +4,15 @@ using Microsoft.Xna.Framework.Input;
 using Nez.Data;
 using Nez.ECS;
 using Nez.Editor;
+using Nez.ImGuiTools.UndoActions;
+using Nez.Persistence;
 using Nez.Utils;
+using Nez.Utils.Coroutines;
 using System;
 using System.Collections;
 using System.Linq;
 using System.Reflection;
-using Nez.Utils.Coroutines;
-using Nez.ImGuiTools.UndoActions;
-using Nez.Persistence;
+using static Nez.Entity;
 
 namespace Nez.ImGuiTools.SceneGraphPanes;
 
@@ -551,7 +552,7 @@ public class EntityPane
 	/// If the entity is HardCoded, the clone will be of type Dynamic.
 	/// Uses JSON serialization for reliable component copying.
 	/// </summary>
-	public Entity DuplicateEntity(Entity entity, string customName = null, Entity.InstanceType type = Entity.InstanceType.Dynamic)
+	public Entity DuplicateEntity(Entity entity, string customName = null)
 	{
 		if (entity == null || entity.Scene == null)
 			return null;
@@ -561,7 +562,6 @@ public class EntityPane
 		{
 			// Set up the clone with basic properties first
 			clone.Name = customName ?? Core.Scene.GetUniqueEntityName(entity.Name, entity);
-			clone.Type = type;
 			clone.Transform.Position = entity.Transform.Position;
 			clone.Transform.Rotation = entity.Rotation;
 			clone.Transform.Scale = entity.Scale;
@@ -570,6 +570,14 @@ public class EntityPane
 			clone.DebugRenderEnabled = entity.DebugRenderEnabled;
 			clone.UpdateInterval = entity.UpdateInterval;
 			clone.UpdateOrder = entity.UpdateOrder;
+
+			if(entity.Type == InstanceType.HardCoded || entity.Type == InstanceType.Dynamic)
+				clone.Type = InstanceType.Dynamic;
+			else
+			{
+				clone.Type = InstanceType.Prefab;
+				clone.OriginalPrefabName = entity.OriginalPrefabName;
+			}
 
 			// IMPORTANT: Copy all components from the source entity BEFORE invoking EntityCreated
 			// This ensures we preserve the original component data before OnAddedToScene runs
@@ -722,7 +730,7 @@ public class EntityPane
 				}
 				
 				// Only duplicate Dynamic and Prefab children
-				var clonedChild = DuplicateEntity(childEntity, null, type);
+				var clonedChild = DuplicateEntity(childEntity, null);
 				if (clonedChild != null)
 				{
 					clonedChild.Transform.SetParent(clone.Transform);
