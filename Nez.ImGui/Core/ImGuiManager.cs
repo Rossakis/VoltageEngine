@@ -94,7 +94,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	public event Action OnResetScene;
 	public event Action<bool> OnSwitchEditMode;
 	public event Func<Entity, Task<bool>> OnPrefabCreated;
-	public event Func<string, SceneData.SceneEntityData> OnPrefabLoadRequested;
+	public event Func<string, PrefabData> OnPrefabLoadRequested;
 	public event Action<Entity, object> OnLoadEntityData; // Add this for loading entity data
 
 
@@ -122,13 +122,13 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		return false;
 	}
 
-	public SceneData.SceneEntityData InvokePrefabLoadRequested(string prefabName)
+	public PrefabData InvokePrefabLoadRequested(string prefabName)
 	{
 		if (OnPrefabLoadRequested != null)
 		{
 			return OnPrefabLoadRequested.Invoke(prefabName);
 		}
-		return new SceneData.SceneEntityData();
+		return new PrefabData();
 	}
 
 	public void InvokeLoadEntityData(Entity entity, object entityData)

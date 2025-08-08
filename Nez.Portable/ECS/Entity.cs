@@ -155,8 +155,6 @@ public class Entity : IComparable<Entity>
 	/// </summary>
 	public virtual EntityData GetEntityData()
 	{
-		// Always ensure EntityData has the correct EntityType
-		EntityData.EntityType = GetType().Name;
 		return EntityData;
 	}
 
@@ -169,9 +167,6 @@ public class Entity : IComparable<Entity>
 		if (data != null)
 		{
 			EntityData = data;
-
-			if (string.IsNullOrEmpty(EntityData.EntityType))
-				EntityData.EntityType = GetType().Name;
 		}
 	}
 

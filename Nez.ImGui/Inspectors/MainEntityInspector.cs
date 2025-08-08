@@ -301,7 +301,7 @@ public class MainEntityInspector
 					NezImGui.MediumVerticalSpace();
 				}
 
-				if (NezImGui.CenteredButton("Create Prefab", 0.6f))
+				if (Entity.Type != Entity.InstanceType.HardCoded && NezImGui.CenteredButton("Create Prefab", 0.6f))
 				{
 					_prefabName = Entity.Name + "_Prefab";
 					ImGui.OpenPopup("prefab-creator");

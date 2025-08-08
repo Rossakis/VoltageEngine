@@ -604,8 +604,6 @@ public class EntityPane
 							
 							// Also copy other component properties
 							existingComponent.Enabled = sourceComponent.Enabled;
-							
-							System.Console.WriteLine($"Successfully copied data to existing component: {sourceComponent.GetType().Name}");
 						}
 						catch (Exception ex)
 						{
@@ -656,8 +654,6 @@ public class EntityPane
 							
 							// Apply the cloned data to the new component
 							clonedComponent.Data = clonedData;
-
-							System.Console.WriteLine($"Successfully copied data for new component: {sourceComponent.GetType().Name}");
 						}
 						catch (Exception ex)
 						{
@@ -670,7 +666,6 @@ public class EntityPane
 								if (fallbackClone != null && fallbackClone.Data != null)
 								{
 									clonedComponent.Data = fallbackClone.Data;
-									System.Console.WriteLine($"Used Clone() fallback for component: {sourceComponent.GetType().Name}");
 								}
 							}
 							catch (Exception cloneEx)
@@ -707,8 +702,6 @@ public class EntityPane
 						var json = Json.ToJson(sourceComponent.Data, componentJsonSettings);
 						var clonedData = (ComponentData)Json.FromJson(json, sourceComponent.Data.GetType());
 						targetComponent.Data = clonedData;
-						
-						System.Console.WriteLine($"Post-creation data copy for component: {sourceComponent.GetType().Name}");
 					}
 					catch (Exception ex)
 					{

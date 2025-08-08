@@ -16,24 +16,19 @@ namespace Nez.Data
         [InspectableAttribute]
         public int NumberOfSerializedComponents => ComponentDataList?.Count ?? 0;
 
-        public string EntityType;
-
 		public EntityData()
 		{
 			ComponentDataList = new List<ComponentDataEntry>();
-			EntityType = string.Empty;
 		}
 
 		public EntityData(Entity entity)
         {
             ComponentDataList = new List<ComponentDataEntry>();
-            EntityType = entity.GetType().Name;
         }
 
         public EntityData(string entityType)
         {
             ComponentDataList = new List<ComponentDataEntry>();
-            EntityType = entityType;
         }
 
         /// <summary>
@@ -43,7 +38,6 @@ namespace Nez.Data
         {
             var clone = new EntityData
             {
-                EntityType = EntityType,
                 ComponentDataList = new List<ComponentDataEntry>()
             };
 

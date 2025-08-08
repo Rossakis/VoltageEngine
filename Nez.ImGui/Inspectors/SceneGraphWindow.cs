@@ -255,11 +255,8 @@ public class SceneGraphWindow
 					if (string.IsNullOrEmpty(_entityFilterName) ||
 					    prefabName.ToLower().Contains(_entityFilterName.ToLower()))
 					{
-						// Use selectable with right-click context menu
-						bool isClicked = ImGui.Selectable($"{prefabName} [Prefab]");
-						
-						// Handle left-click to create prefab
-						if (isClicked && ImGui.IsMouseClicked(ImGuiMouseButton.Left))
+						// Handle left-click to create prefab - FIXED VERSION
+						if (ImGui.Selectable($"{prefabName} [Prefab]"))
 						{
 							CreateEntityFromPrefab(prefabName);
 							ImGui.CloseCurrentPopup();
@@ -274,7 +271,7 @@ public class SceneGraphWindow
 						// Draw context menu for this prefab
 						if (ImGui.BeginPopup($"prefab-context-{prefabName}"))
 						{
-							if (ImGui.Selectable("Create from Prefab"))
+							if (ImGui.Selectable("Create Prefab Instance"))
 							{
 								CreateEntityFromPrefab(prefabName);
 								ImGui.CloseCurrentPopup();
@@ -314,7 +311,7 @@ public class SceneGraphWindow
 		}
 
 		// Center the popup when it first appears
-		var center = new Num.Vector2(Screen.Width * 0.5f, Screen.Height * 0.4f);
+		var center = new Num.Vector2(Screen.Width * 0.45f, Screen.Height * 0.7f);
 		ImGui.SetNextWindowPos(center, ImGuiCond.Appearing, new Num.Vector2(0.5f, 0.5f));
 
 		bool open = true;
@@ -456,72 +453,62 @@ public class SceneGraphWindow
 	/// </summary>
 	private void CreateEntityFromPrefab(string prefabName)
 	{
-		// Use the event system to load prefab data from the DataLoader
-		var prefabData = _imGuiManager.InvokePrefabLoadRequested(prefabName);
-		// if (prefabData == null)
-		// {
-		// 	NotificationSystem.ShowTimedNotification($"Failed to load prefab: {prefabName}");
-		// 	return;
-		// }
-
-		// Cast the returned object to the expected type
-		// We'll use reflection to access the properties since we can't reference the JoltMono types directly
-		var prefabDataType = prefabData.GetType();
-		var entityTypeProperty = prefabDataType.GetProperty("EntityType");
-		
-		if (entityTypeProperty == null)
+		try
 		{
-			NotificationSystem.ShowTimedNotification($"Invalid prefab data format for: {prefabName} - EntityType property not found");
-			return;
-		}
+			// Use the event system to load prefab data from the DataLoader
+			var prefabData = _imGuiManager.InvokePrefabLoadRequested(prefabName);
 
-		var entityTypeName = entityTypeProperty.GetValue(prefabData) as string;
-
-		if (string.IsNullOrEmpty(entityTypeName))
-		{
-			NotificationSystem.ShowTimedNotification($"Prefab {prefabName} has no entity type specified");
-			return;
-		}
-
-		// Generate a unique name for the new entity instance
-		var uniqueName = Core.Scene.GetUniqueEntityName(entityTypeName, null); 
-
-		if (EntityFactoryRegistry.TryCreate(entityTypeName, out var entity))
-		{
-			EntityFactoryRegistry.InvokeEntityCreated(entity);
+			// Cast the returned object to the expected type
+			// We'll use reflection to access the properties since we can't reference the JoltMono types directly
 			
-			// Set as dynamic instance (instantiated from prefab, but not a prefab itself)
-			entity.Type = Entity.InstanceType.Dynamic;
-			entity.Name = Core.Scene.GetUniqueEntityName(entityTypeName, entity);
-			entity.Transform.Position = Core.Scene.Camera.Transform.Position;
-
-			// Load the prefab data into the entity using the event system
-			_imGuiManager.InvokeLoadEntityData(entity, prefabData);
-
-			// Override the name with our unique name (LoadPredefinedEntityData sets it to prefab name)
-			entity.Name = uniqueName;
-
-			// Undo/Redo support for entity creation
-			EditorChangeTracker.PushUndo(
-				new EntityCreateDeleteUndoAction(Core.Scene, entity, wasCreated: true,
-					$"Create Entity from Prefab {entity.Name}"),
-				entity,
-				$"Create Entity from Prefab {entity.Name}"
-			);
-
-			// Select and open inspector
-			var imGuiManager = Core.GetGlobalManager<ImGuiManager>();
-			if (imGuiManager != null)
+			if (prefabData.EntityData == null)
 			{
-				imGuiManager.SceneGraphWindow.EntityPane.SelectedEntity = entity;
-				_imGuiManager.MainEntityInspector.DelayedSetEntity(entity);
+				NotificationSystem.ShowTimedNotification($"Null Prefab EntityData: {prefabName}");
+				return;
 			}
 
-			NotificationSystem.ShowTimedNotification($"Created entity from prefab: {prefabName}");
+			if (prefabData.EntityType == null)
+			{
+				NotificationSystem.ShowTimedNotification($"Invalid prefab data format for: {prefabName} - EntityType property not found");
+				return;
+			}
+
+			if (EntityFactoryRegistry.TryCreate(prefabData.EntityType, out var entity))
+			{
+				EntityFactoryRegistry.InvokeEntityCreated(entity);
+
+				// Set as dynamic instance (instantiated from prefab, but not a prefab itself)
+				entity.Type = Entity.InstanceType.Prefab;
+				entity.Transform.Position = Core.Scene.Camera.Transform.Position;
+
+				// Load the prefab data into the entity using the event system
+				_imGuiManager.InvokeLoadEntityData(entity, prefabData);
+
+				entity.Name = Core.Scene.GetUniqueEntityName(prefabData.Name, entity);
+
+				// Undo/Redo support for entity creation
+				EditorChangeTracker.PushUndo(
+					new EntityCreateDeleteUndoAction(Core.Scene, entity, wasCreated: true,
+						$"Create Entity from Prefab {entity.Name}"),
+					entity,
+					$"Create Entity from Prefab {entity.Name}"
+				);
+
+				_imGuiManager.SceneGraphWindow.EntityPane.SelectedEntity = entity;
+				_imGuiManager.MainEntityInspector.DelayedSetEntity(entity);
+
+				NotificationSystem.ShowTimedNotification($"Created entity from prefab: {prefabName}");
+			}
+			else
+			{
+				NotificationSystem.ShowTimedNotification(
+					$"Failed to create entity from prefab: {prefabName}. Entity type '{prefabData.EntityType}' not registered.");
+			}
+
 		}
-		else
+		catch (Exception ex)
 		{
-			NotificationSystem.ShowTimedNotification($"Failed to create entity from prefab: {prefabName}. Entity type '{entityTypeName}' not registered.");
+			NotificationSystem.ShowTimedNotification($"Error creating entity from prefab {prefabName}: {ex.Message}");
 		}
 	}
 
