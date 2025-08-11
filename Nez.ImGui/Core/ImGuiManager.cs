@@ -168,8 +168,10 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 
 		// Create default Main Entity Inspector window when current scene is finished loading the entities
 		Scene.OnFinishedAddingEntitiesWithData += OpenMainEntityInspector;
-		OnResetScene += RequestResetScene;
 		Core.EmitterWithPending.AddObserver(CoreEvents.Exiting, OnAppExitSaveChanges);
+
+		OnResetScene += RequestResetScene;
+		OnSwitchEditMode += OnEditModeSwitched;
 	}
 
 	/// <summary>
@@ -747,6 +749,15 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	{
 	    var scene = (Scene)Activator.CreateInstance(sceneType);
 	    Core.StartSceneTransition(new FadeTransition(() => scene));
+	}
+
+	private void OnEditModeSwitched(bool isEditMode)
+	{
+		// Only reset scene if switching to EditMode from PlayMode
+		if (isEditMode && Core.ResetSceneAutomatically)
+		{
+			ResetScene();
+		}
 	}
 
 	public void RequestResetScene()

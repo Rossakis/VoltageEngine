@@ -50,6 +50,11 @@ public class Core : Game
 	public static bool DebugRenderEnabled = false;
 
 	/// <summary>
+	/// If true, the scene will automatically reset after going from PlayMode back to EditMode (resetting all values that weren't saved beforehand, for consistency) .
+	/// </summary>
+	public static bool ResetSceneAutomatically = true;
+
+	/// <summary>
 	/// global access to the graphicsDevice
 	/// </summary>
 	public new static GraphicsDevice GraphicsDevice;

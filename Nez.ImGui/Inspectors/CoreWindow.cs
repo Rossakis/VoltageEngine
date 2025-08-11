@@ -42,6 +42,7 @@ namespace Nez.ImGuiTools
 
 			if (ImGui.CollapsingHeader("Core Settings", ImGuiTreeNodeFlags.DefaultOpen))
 			{
+				ImGui.Checkbox("ResetSceneAutomatically", ref Core.ResetSceneAutomatically);
 				ImGui.Checkbox("exitOnEscapeKeypress", ref Core.ExitOnEscapeKeypress);
 				ImGui.Checkbox("pauseOnFocusLost", ref Core.PauseOnFocusLost);
 				ImGui.Checkbox("debugRenderEnabled", ref Core.DebugRenderEnabled);
