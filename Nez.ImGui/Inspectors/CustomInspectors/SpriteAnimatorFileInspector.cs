@@ -22,7 +22,7 @@ namespace Nez.ImGuiTools.Inspectors.CustomInspectors
         private static string _lastSelectedAsepriteFile = null;
         private static List<string> _availableTags = new();
         private static int _selectedTagIndex = -1;
-
+        private ImGuiManager imGuiManager;
         public SpriteAnimatorFileInspector()
         {
         }
@@ -33,9 +33,28 @@ namespace Nez.ImGuiTools.Inspectors.CustomInspectors
             _name = "Animation File Loader";
         }
 
+        public static AnimationEventInspector AnimationEventInspectorInstance;
+
         public override void DrawMutable()
-        {
-            var animator = _target as SpriteAnimator;
+		{
+			SpriteAnimator animator = _target as SpriteAnimator;
+			
+			if(imGuiManager == null)
+				imGuiManager = Core.GetGlobalManager<ImGuiManager>();
+
+			if (ImGui.Button("Manage Animation Events", new Num.Vector2(-1, 0)))
+            {
+                if (imGuiManager.AnimationEventInspectorInstance == null)
+                {
+                    imGuiManager.ShowAnimationEventInspector = true;
+                }
+                else
+                {
+                    imGuiManager.AnimationEventInspectorInstance.SetAnimator(animator);
+                    imGuiManager.AnimationEventInspectorInstance.SetWindowFocus();
+                }
+            }
+
             if (animator == null)
                 return;
 

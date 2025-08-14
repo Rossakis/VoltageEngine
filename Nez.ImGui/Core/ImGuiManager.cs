@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Nez.Data;
+using Nez.ImGuiTools.Inspectors.CustomInspectors;
 using Num = System.Numerics;
 
 
@@ -23,6 +24,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	public bool ShowSceneGraphWindow = true;
 	public bool ShowCoreWindow = true;
 	public bool ShowSeperateGameWindow = true;
+	public bool ShowAnimationEventInspector = false;
 	public bool ShowMenuBar = true;
 
 	public bool FocusGameWindowOnMiddleClick = false;
@@ -37,10 +39,17 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	public SceneGraphWindow SceneGraphWindow { get; private set; }
 	public MainEntityInspector MainEntityInspector { get; private set; }
 
+	public AnimationEventInspector AnimationEventInspectorInstance
+	{
+		get => _animationEventInspector;
+		private set => _animationEventInspector = value;
+	}
+
 	private Num.Vector2 normalEntityInspectorStartPos;
 	private int entitynspectorInitialSpawnOffset = 0;
 	private static int entitynspectorSpawnOffsetIncremental = 20;
 
+	private AnimationEventInspector _animationEventInspector;
 	private SpriteAtlasEditorWindow _spriteAtlasEditorWindow;
 	private List<EntityInspector> _entityInspectors = new();
 	private List<Action> _drawCommands = new();
@@ -55,6 +64,8 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	private Num.Vector2? _gameViewForcedSize;
 	private WindowPosition? _gameViewForcedPos;
 	private float _mainMenuBarHeight;
+	public float GameWindowWidth { get; private set; }
+	public float GameWindowHeight { get; private set; }
 
 	// Camera Params
 	public static float EditModeCameraSpeed = 250f;
@@ -203,6 +214,23 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		UpdateCamera();
 		NotificationSystem.Draw();
 		GlobalKeyCommands();
+
+		if (ShowAnimationEventInspector)
+		{
+			if (_animationEventInspector == null)
+			{
+				_animationEventInspector = new AnimationEventInspector(null);
+				RegisterDrawCommand(_animationEventInspector.Draw);
+			}
+		}
+		else
+		{
+			if (_animationEventInspector != null)
+			{
+				UnregisterDrawCommand(_animationEventInspector.Draw);
+				_animationEventInspector = null;
+			}
+		}
 	}
 
 	public void GlobalKeyCommands()
@@ -327,6 +355,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 				ImGui.MenuItem("Core Window", null, ref ShowCoreWindow);
 				ImGui.MenuItem("Scene Graph Window", null, ref ShowSceneGraphWindow);
 				ImGui.MenuItem("Separate Game Window", null, ref ShowSeperateGameWindow);
+				ImGui.MenuItem("Animation Event Inspector", null, ref ShowAnimationEventInspector);
 				ImGui.EndMenu();
 			}
 
@@ -657,7 +686,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	                {
 	                    selected = entity;
 	                    break;
-	                }
+                    }
 	            }
 	            else
 	            {

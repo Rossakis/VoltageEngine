@@ -153,6 +153,9 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Num.Vector2(0, 0));
 		ImGui.Begin(_gameWindowTitle, _gameWindowFlags);
 
+		GameWindowWidth = ImGui.GetWindowSize().X;
+		GameWindowHeight = ImGui.GetWindowSize().Y;
+
 		// Camera control buttons at top-left
 		var camera = Core.Scene?.Camera;
 		bool showZoomButton = camera != null && Math.Abs(camera.Zoom - Camera.DefaultZoom) > 0.01f;
