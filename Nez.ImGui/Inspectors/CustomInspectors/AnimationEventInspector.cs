@@ -22,13 +22,11 @@ namespace Nez.ImGuiTools.Inspectors.CustomInspectors
 
         private List<AnimationEvent> _editableEvents = new();
         private string _saveStatusMessage = "";
+        private float _saveStatusMessageTime = -1f;
+        private const float SaveMessageDuration = 2f; // seconds
 
         private bool _showAddEventPopup = false;
         private int _newEventTypeIndex = 0; // 0 = AnimationEvent, 1 = LongAnimationEvent
-        private int _newEventStartFrame = 0;
-        private int _newEventEndFrame = 0;
-        private string _newEventName = "NewEvent";
-        private string _newEventAnimationName = null;
 
         public AnimationEventInspector(SpriteAnimator animator)
         {
@@ -168,10 +166,15 @@ namespace Nez.ImGuiTools.Inspectors.CustomInspectors
 
                         // Frame column
                         ImGui.TableSetColumnIndex(0);
+                        // Clamp startFrame
+                        evt.StartFrame = Math.Clamp(evt.StartFrame, 0, frameCount - 1);
                         ImGui.Text("startFrame");
                         ImGui.InputInt($"##startFrame_{evtIndex}", ref evt.StartFrame);
+
                         if (evt is LongAnimationEvent longEvt)
                         {
+                            // Clamp endFrame
+                            longEvt.EndFrame = Math.Clamp(longEvt.EndFrame, 0, frameCount - 1);
                             ImGui.Text("endFrame");
                             ImGui.InputInt($"##endFrame_{evtIndex}", ref longEvt.EndFrame);
                         }
@@ -181,12 +184,12 @@ namespace Nez.ImGuiTools.Inspectors.CustomInspectors
                         string name = evt.Name ?? "";
                         if (ImGui.InputText($"##name_{evtIndex}", ref name, 32))
                         {
-                            // Ensure uniqueness
-                            if (_editableEvents.Any(e => e != evt && e.Name == name))
+                            // Ensure uniqueness only within the same animation
+                            if (_editableEvents.Any(e => e != evt && e.Name == name && e.AnimationName == evt.AnimationName))
                             {
                                 int suffix = 1;
                                 string baseName = name;
-                                while (_editableEvents.Any(e => e != evt && e.Name == name))
+                                while (_editableEvents.Any(e => e != evt && e.Name == name && e.AnimationName == evt.AnimationName))
                                 {
                                     name = $"{baseName}_{suffix++}";
                                 }
@@ -256,13 +259,14 @@ namespace Nez.ImGuiTools.Inspectors.CustomInspectors
                         if (ImGui.Button("Create"))
                         {
                             var oldEvents = new List<AnimationEvent>(_editableEvents);
+                            var animationName = animationNames[_selectedAnimationIndex];
                             if (_newEventTypeIndex == 0)
                             {
                                 _editableEvents.Add(new AnimationEvent
                                 {
                                     StartFrame = 0,
                                     Name = "",
-                                    AnimationName = null
+                                    AnimationName = animationName 
                                 });
                             }
                             else
@@ -272,7 +276,7 @@ namespace Nez.ImGuiTools.Inspectors.CustomInspectors
                                     StartFrame = 0,
                                     EndFrame = 0,
                                     Name = "",
-                                    AnimationName = null
+                                    AnimationName = animationName 
                                 });
                             }
                             EditorChangeTracker.PushUndo(
@@ -302,7 +306,12 @@ namespace Nez.ImGuiTools.Inspectors.CustomInspectors
                 ImGui.Separator();
 
                 // Save button
-                if (ImGui.Button("Save"))
+                float buttonWidth = ImGui.GetWindowWidth() * 0.5f; 
+                float buttonHeight = ImGui.GetFontSize() * 2.2f;  
+                float cursorX = (ImGui.GetWindowWidth() - buttonWidth) * 0.5f;
+                ImGui.SetCursorPosX(cursorX);
+
+                if (ImGui.Button("Save", new Num.Vector2(buttonWidth, buttonHeight)))
                 {
                     try
                     {
@@ -323,6 +332,7 @@ namespace Nez.ImGuiTools.Inspectors.CustomInspectors
                             })
                             .ToList();
                         _saveStatusMessage = "Events saved successfully!";
+                        _saveStatusMessageTime = Time.TotalTime; // Start timer
 
                         // Save the entire scene after saving animation events
                         _imGuiManager.InvokeSaveSceneChanges();
@@ -330,12 +340,22 @@ namespace Nez.ImGuiTools.Inspectors.CustomInspectors
                     catch (Exception ex)
                     {
                         _saveStatusMessage = $"Save failed: {ex.Message}";
+                        _saveStatusMessageTime = Time.TotalTime;
                     }
                 }
 
-                if (!string.IsNullOrEmpty(_saveStatusMessage))
+                // Show status message only for a few seconds
+                if (!string.IsNullOrEmpty(_saveStatusMessage) && _saveStatusMessageTime >= 0)
                 {
-                    ImGui.TextColored(new Num.Vector4(0.2f, 1.0f, 0.2f, 1.0f), _saveStatusMessage);
+                    if (Time.TotalTime - _saveStatusMessageTime < SaveMessageDuration)
+                    {
+                        ImGui.TextColored(new Num.Vector4(0.2f, 1.0f, 0.2f, 1.0f), _saveStatusMessage);
+                    }
+                    else
+                    {
+                        _saveStatusMessage = "";
+                        _saveStatusMessageTime = -1f;
+                    }
                 }
             }
             ImGui.End();

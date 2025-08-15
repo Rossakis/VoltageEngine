@@ -698,7 +698,7 @@ public class SpriteAnimator : SpriteRenderer, IUpdatable
 		if (ext != ".ase" && ext != ".aseprite")
 			throw new ArgumentException("Only .ase or .aseprite files are supported for SpriteAnimator animation loading.");
 
-		Nez.Utils.AnimationUtils.LoadAsepriteAnimation(Entity, TextureFilePath, animationTagName, callableAnimationName, layerName);
+		AnimationUtils.LoadAsepriteAnimation(Entity, TextureFilePath, animationTagName, callableAnimationName, layerName);
 	}
 
 	public void SubscribeToEvent(string animationName, string eventName, Action callback)
