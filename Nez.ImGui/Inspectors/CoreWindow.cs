@@ -12,7 +12,7 @@ namespace Nez.ImGuiTools
 		string[] _textureFilters;
 		float[] _frameRateArray = new float[100];
 		int _frameRateArrayIndex = 0;
-
+		private ImGuiManager _imguiManager;
 		public CoreWindow()
 		{
 			_textureFilters = Enum.GetNames(typeof(TextureFilter));
@@ -23,9 +23,20 @@ namespace Nez.ImGuiTools
 			if (!isOpen)
 				return;
 
-			ImGui.SetNextWindowPos(new Num.Vector2(Screen.Width - 300, Screen.Height - 240), ImGuiCond.FirstUseEver);
-			ImGui.SetNextWindowSize(new Num.Vector2(300, 240), ImGuiCond.FirstUseEver);
-			ImGui.Begin("Nez Core", ref isOpen);
+			if (_imguiManager == null)
+				_imguiManager = Core.GetGlobalManager<ImGuiManager>();
+
+			float inspectorWidth = _imguiManager.MainEntityInspector?.MainInspectorWidth ?? 500f;
+			float inspectorPosY = MainEntityInspector.MainInspectorPosY;
+			float windowPosX = Screen.Width - inspectorWidth;
+			float windowHeight = Screen.Height - inspectorPosY;
+
+			// Use a unique window name and prevent docking
+			ImGui.SetNextWindowPos(new Num.Vector2(windowPosX, inspectorPosY), ImGuiCond.Always);
+			ImGui.SetNextWindowSize(new Num.Vector2(inspectorWidth, windowHeight), ImGuiCond.Always);
+
+			ImGui.Begin("##NezCoreWindow", ref isOpen, ImGuiWindowFlags.NoDocking | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoTitleBar);
+
 			DrawSettings();
 			ImGui.End();
 		}

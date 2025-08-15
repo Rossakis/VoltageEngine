@@ -119,7 +119,7 @@ public class SceneGraphWindow
 		ImGui.SetNextWindowPos(new Num.Vector2(0, SceneGraphPosY), ImGuiCond.Always);
 		ImGui.SetNextWindowSize(new Num.Vector2(_sceneGraphWidth, windowHeight), ImGuiCond.FirstUseEver);
 
-		var windowFlags = ImGuiWindowFlags.NoMove;
+		var windowFlags = ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoCollapse;
 
 		if (ImGui.Begin("Scene Graph", ref isOpen, windowFlags))
 		{

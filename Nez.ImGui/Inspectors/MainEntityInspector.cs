@@ -23,8 +23,8 @@ public class MainEntityInspector
 	private float _minInspectorWidth = 1f;
 	private float _maxInspectorWidth = Screen.MonitorWidth;
 	public bool IsOpen { get; set; } = true; // Separate open/close flag
-	public float MainInspectorPosY { get; private set; }
-
+	public static float MainInspectorPosY => 20f * ImGui.GetIO().FontGlobalScale;
+	public static float MainInspectorOffsetY => 24 * ImGui.GetIO().FontGlobalScale;
 	private readonly string _windowId = "MAIN_INSPECTOR_WINDOW";
 	private TransformInspector _transformInspector;
 	private List<IComponentInspector> _componentInspectors = new();
@@ -97,14 +97,11 @@ public class MainEntityInspector
 		if(_imguiManager == null)
 			_imguiManager = Core.GetGlobalManager<ImGuiManager>();
 
-		var topMargin = 20f * ImGui.GetIO().FontGlobalScale;
-
 		ImGui.PushStyleVar(ImGuiStyleVar.GrabMinSize, 0.0f);
 		ImGui.PushStyleColor(ImGuiCol.ResizeGrip, new Num.Vector4(0, 0, 0, 0));
 
 		var windowPosX = Screen.Width - _mainInspectorWidth;
-		var windowHeight = Screen.Height - topMargin;
-		MainInspectorPosY = topMargin;
+		var windowHeight = Screen.Height - MainInspectorPosY;
 
 		ImGui.SetNextWindowPos(new Num.Vector2(windowPosX, MainInspectorPosY), ImGuiCond.Always);
 
@@ -112,9 +109,10 @@ public class MainEntityInspector
 		ImGui.SetNextWindowSize(new Num.Vector2(_mainInspectorWidth, windowHeight), ImGuiCond.FirstUseEver);
 
 		var open = IsOpen;
-		var windowTitle = $"Main Inspector##{_windowId}"; // constant title
+		// Use flags to hide title bar and prevent collapsing
+		var windowFlags = ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoCollapse;
 
-		if (ImGui.Begin(windowTitle, ref open, ImGuiWindowFlags.None))
+		if (ImGui.Begin("##MainEntityInspector", ref open, windowFlags))
 		{
 			var entityName = Entity != null ? Entity.Name : "";
 			ImGui.SetWindowFontScale(1.5f); // Double the font size for header effect

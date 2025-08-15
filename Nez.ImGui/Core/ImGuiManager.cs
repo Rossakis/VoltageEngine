@@ -67,6 +67,9 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	public float GameWindowWidth { get; private set; }
 	public float GameWindowHeight { get; private set; }
 
+	private enum InspectorTab { EntityInspector, Core }
+	private InspectorTab _selectedInspectorTab = InspectorTab.EntityInspector;
+
 	// Camera Params
 	public static float EditModeCameraSpeed = 250f;
 	public static float EditModeCameraFastSpeed = 500f;
@@ -186,8 +189,58 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		if (ShowSeperateGameWindow)
 			DrawGameWindow();
 
-		if (MainEntityInspector != null)
-			MainEntityInspector.Draw();
+		// If MainEntityInspector is active, show tab bar above inspector window
+		if (MainEntityInspector != null && MainEntityInspector.IsOpen)
+		{
+			var windowPosX = Screen.Width - MainEntityInspector.MainInspectorWidth;
+			var windowHeight = Screen.Height - MainEntityInspector.MainInspectorPosY;
+			var windowSize = new Num.Vector2(MainEntityInspector.MainInspectorWidth, windowHeight);
+			var windowPos = new Num.Vector2(windowPosX, MainEntityInspector.MainInspectorPosY - MainEntityInspector.MainInspectorOffsetY);
+
+			// Draw tab selection bar above the inspector window
+			ImGui.SetNextWindowPos(windowPos, ImGuiCond.Always);
+			ImGui.SetNextWindowSize(windowSize, ImGuiCond.Always);
+
+			ImGui.Begin("InspectorTabBar", ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoSavedSettings);
+
+			// Tab bar
+			if (ImGui.BeginTabBar("InspectorTabs", ImGuiTabBarFlags.NoCloseWithMiddleMouseButton))
+			{
+				if (ImGui.BeginTabItem("Entity Inspector"))
+				{
+					_selectedInspectorTab = InspectorTab.EntityInspector;
+					ImGui.EndTabItem();
+				}
+				if (ShowCoreWindow && ImGui.BeginTabItem("Core"))
+				{
+					_selectedInspectorTab = InspectorTab.Core;
+					ImGui.EndTabItem();
+				}
+				ImGui.EndTabBar();
+			}
+			ImGui.End();
+
+			// Draw the selected inspector window at the same position/size
+			ImGui.SetNextWindowPos(windowPos, ImGuiCond.Always);
+			ImGui.SetNextWindowSize(windowSize, ImGuiCond.Always);
+
+			if (_selectedInspectorTab == InspectorTab.EntityInspector)
+			{
+				MainEntityInspector.Draw();
+			}
+			else if (_selectedInspectorTab == InspectorTab.Core && ShowCoreWindow)
+			{
+				_coreWindow.Show(ref ShowCoreWindow);
+			}
+		}
+		else
+		{
+			// If MainEntityInspector is not active, show CoreWindow as a standalone window
+			if (ShowCoreWindow)
+			{
+				_coreWindow.Show(ref ShowCoreWindow);
+			}
+		}
 
 		DrawEntityInspectors();
 
@@ -195,7 +248,6 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 			_drawCommands[i]();
 
 		SceneGraphWindow.Show(ref ShowSceneGraphWindow);
-		_coreWindow.Show(ref ShowCoreWindow);
 
 		if (_spriteAtlasEditorWindow != null)
 			if (!_spriteAtlasEditorWindow.Show())
