@@ -97,6 +97,15 @@ public class MainEntityInspector
 		if(_imguiManager == null)
 			_imguiManager = Core.GetGlobalManager<ImGuiManager>();
 
+		//TODO: Change this
+		var selectedEntities = _imguiManager.SceneGraphWindow.EntityPane.SelectedEntities;
+		if (selectedEntities.Count > 1)
+		{
+			ImGui.TextColored(new Num.Vector4(1, 1, 0, 1), "You selected multiple entities.");
+			ImGui.End();
+			return;
+		}
+
 		ImGui.PushStyleVar(ImGuiStyleVar.GrabMinSize, 0.0f);
 		ImGui.PushStyleColor(ImGuiCol.ResizeGrip, new Num.Vector4(0, 0, 0, 0));
 

@@ -1219,67 +1219,68 @@ public class Scene
 	/// </summary>
 	/// <param name="baseName"></param>
 	/// <returns></returns>
-	public string GetUniqueEntityName(string baseName, Entity entity)
+	public string GetUniqueEntityName(string baseName, Entity entity, IEnumerable<Entity> pendingEntities = null)
 	{
-		var baseLower = baseName.ToLower();
+	    var baseLower = baseName.ToLower();
 
-		var allNames = new List<string>();
-		for (var i = 0; i < Entities.Count; i++)
-		{
-			if (Entities[i] == entity) // Don't compare with itself
-				continue;
+	    var allNames = new List<string>();
+	    for (var i = 0; i < Entities.Count; i++)
+	    {
+	        if (Entities[i] == entity)
+	            continue;
+	        allNames.Add(Entities[i].Name.ToLower());
+	    }
+	    if (pendingEntities != null)
+	    {
+	        foreach (var e in pendingEntities)
+	        {
+	            if (e == entity)
+	                continue;
+	            allNames.Add(e.Name.ToLower());
+	        }
+	    }
 
-			allNames.Add(Entities[i].Name.ToLower());
-		}
+	    if (!allNames.Contains(baseLower))
+	        return baseName;
 
-		// If baseName is available, return it AS-IS without any modification
-		if (!allNames.Contains(baseLower))
-			return baseName;
+	    var inputPattern = @"^(.+?)[_\-]?(\d+)$";
+	    var inputMatch = System.Text.RegularExpressions.Regex.Match(baseName, inputPattern);
 
-		// Extract the base name and starting number if the input already has a number
-		var inputPattern = @"^(.+?)[_\-]?(\d+)$";
-		var inputMatch = System.Text.RegularExpressions.Regex.Match(baseName, inputPattern);
-		
-		string actualBaseName;
-		int startingNumber;
-		
-		if (inputMatch.Success)
-		{
-			// Input already has a number, extract the base and number
-			actualBaseName = inputMatch.Groups[1].Value;
-			startingNumber = int.Parse(inputMatch.Groups[2].Value);
-		}
-		else
-		{
-			// Input has no number, start from 1
-			actualBaseName = baseName;
-			startingNumber = 1;
-		}
+	    string actualBaseName;
+	    int startingNumber;
 
-		// Find the highest existing number for this base name
-		var baseNameLower = actualBaseName.ToLower();
-		var pattern = @"^" + System.Text.RegularExpressions.Regex.Escape(baseNameLower) + @"(?:[_\-]?(\d+))?$";
-		var maxNum = startingNumber - 1; // Start one below the input number
+	    if (inputMatch.Success)
+	    {
+	        actualBaseName = inputMatch.Groups[1].Value;
+	        startingNumber = int.Parse(inputMatch.Groups[2].Value);
+	    }
+	    else
+	    {
+	        actualBaseName = baseName;
+	        startingNumber = 1;
+	    }
 
-		foreach (var name in allNames)
-		{
-			var match = System.Text.RegularExpressions.Regex.Match(name, pattern);
-			if (match.Success)
-			{
-				if (string.IsNullOrEmpty(match.Groups[1].Value))
-				{
-					// This is the base name without a number
-					maxNum = Math.Max(maxNum, 0);
-				}
-				else if (int.TryParse(match.Groups[1].Value, out var num))
-				{
-					// This is a numbered variant
-					maxNum = Math.Max(maxNum, num);
-				}
-			}
-		}
+	    var baseNameLower = actualBaseName.ToLower();
+	    var pattern = @"^" + System.Text.RegularExpressions.Regex.Escape(baseNameLower) + @"(?:[_\-]?(\d+))?$";
+	    var maxNum = startingNumber - 1;
 
-		return $"{actualBaseName}_{maxNum + 1}";
+	    foreach (var name in allNames)
+	    {
+	        var match = System.Text.RegularExpressions.Regex.Match(name, pattern);
+	        if (match.Success)
+	        {
+	            if (string.IsNullOrEmpty(match.Groups[1].Value))
+	            {
+	                maxNum = Math.Max(maxNum, 0);
+	            }
+	            else if (int.TryParse(match.Groups[1].Value, out var num))
+	            {
+	                maxNum = Math.Max(maxNum, num);
+	            }
+	        }
+	    }
+
+	    return $"{actualBaseName}_{maxNum + 1}";
 	}
 
 	#endregion

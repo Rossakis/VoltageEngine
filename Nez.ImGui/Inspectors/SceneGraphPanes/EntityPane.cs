@@ -10,6 +10,7 @@ using Nez.Utils;
 using Nez.Utils.Coroutines;
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using static Nez.Entity;
@@ -25,26 +26,59 @@ public class EntityPane
     private const int MIN_ENTITIES_FOR_CLIPPER = 100;
 
     private Entity _previousEntity; // Used for rendering a collider box for the currently selected entity
-    private Entity _selectedEntity;
+									//private Entity _selectedEntity;
 
-    public Entity SelectedEntity
-    {
-        get => _selectedEntity;
-        set
-        {
-            _selectedEntity = value;
-        }
-    }
+	public IReadOnlyList<Entity> SelectedEntities => _selectedEntities;
+	public void SetSelectedEntity(Entity entity, bool ctrlDown, bool shiftDown = false)
+	{
+		if (entity == null)
+			return;
 
-    private ImGuiManager _imGuiManager;
+		var hierarchyList = Core.GetGlobalManager<ImGuiManager>().SceneGraphWindow.BuildHierarchyList();
+
+		if (shiftDown && _lastRangeSelectEntity != null)
+		{
+			// Select range between _lastRangeSelectEntity and entity
+			int startIdx = hierarchyList.IndexOf(_lastRangeSelectEntity);
+			int endIdx = hierarchyList.IndexOf(entity);
+			if (startIdx != -1 && endIdx != -1)
+			{
+				int minIdx = Math.Min(startIdx, endIdx);
+				int maxIdx = Math.Max(startIdx, endIdx);
+				_selectedEntities.Clear();
+				for (int i = minIdx; i <= maxIdx; i++)
+					_selectedEntities.Add(hierarchyList[i]);
+			}
+		}
+		else if (ctrlDown)
+		{
+			if (_selectedEntities.Contains(entity))
+				_selectedEntities.Remove(entity);
+			else
+				_selectedEntities.Add(entity);
+			_lastRangeSelectEntity = entity;
+		}
+		else
+		{
+			_selectedEntities.Clear();
+			_selectedEntities.Add(entity);
+			_lastRangeSelectEntity = entity;
+		}
+	}
+	private ImGuiManager _imGuiManager;
 
     private bool _draggingX = false;
     private bool _draggingY = false;
-    private Vector2 _dragStartEntityPos;
     private Vector2 _dragStartWorldMouse;
-    private Vector2 _dragStartUndoPosition;
 
-    private Entity _copiedEntity; // For Ctrl+C/Ctrl+V
+    private List<Entity> _copiedEntities = new();
+
+    private List<Entity> _selectedEntities = new();
+
+	private Dictionary<Entity, Vector2> _dragStartEntityPositions = new();
+	private Dictionary<Entity, Vector2> _dragEndEntityPositions = new();
+
+	private Entity _lastRangeSelectEntity;
 
 	#endregion
 
@@ -96,8 +130,14 @@ public class EntityPane
 	/// </summary>
 	private void DrawSelectedEntityGizmo()
 	{
-		if (_selectedEntity == null || !Core.IsEditMode)
+		if (_selectedEntities.Count == 0 || !Core.IsEditMode)
 			return;
+
+		// Compute center of all selected entities
+		Vector2 center = Vector2.Zero;
+		foreach (var e in _selectedEntities)
+			center += e.Transform.Position;
+		center /= _selectedEntities.Count;
 
 		var camera = Core.Scene.Camera;
 		float baseLength = 30f;
@@ -112,10 +152,9 @@ public class EntityPane
 		if (camera.RawZoom > 1f)
 			scaledWidth = MathF.Min(baseWidth * camera.RawZoom, maxWidth);
 
-		var entityPos = _selectedEntity.Transform.Position;
-		var screenPos = camera.WorldToScreenPoint(entityPos);
-		var axisEndX = camera.WorldToScreenPoint(entityPos + new Vector2(axisLength, 0));
-		var axisEndY = camera.WorldToScreenPoint(entityPos + new Vector2(0, -axisLength));
+		var screenPos = camera.WorldToScreenPoint(center);
+		var axisEndX = camera.WorldToScreenPoint(center + new Vector2(axisLength, 0));
+		var axisEndY = camera.WorldToScreenPoint(center + new Vector2(0, -axisLength));
 
 		Color xColor = Color.Red;
 		Color yColor = Color.LimeGreen;
@@ -135,8 +174,8 @@ public class EntityPane
 		else if (yHovered)
 			yColor = Color.Orange;
 
-		Debug.DrawArrow(entityPos, entityPos + new Vector2(axisLength, 0), scaledWidth, scaledWidth, xColor);
-		Debug.DrawArrow(entityPos, entityPos + new Vector2(0, -axisLength), scaledWidth, scaledWidth, yColor);
+		Debug.DrawArrow(center, center + new Vector2(axisLength, 0), scaledWidth, scaledWidth, xColor);
+		Debug.DrawArrow(center, center + new Vector2(0, -axisLength), scaledWidth, scaledWidth, yColor);
 
 		if (prevCameraPos == Vector2.Zero)
 			prevCameraPos = camera.Position;
@@ -153,20 +192,16 @@ public class EntityPane
 					_draggingX = true;
 					_draggingY = true;
 				}
-				else if (xHovered)
-				{
-					_draggingX = true;
-				}
 				else if (yHovered)
 				{
 					_draggingY = true;
 				}
 
-				_dragStartEntityPos = entityPos;
-				_dragStartWorldMouse = camera.ScreenToWorldPoint(mousePos);
+				_dragStartEntityPositions.Clear();
+				foreach (var entity in _selectedEntities)
+                    _dragStartEntityPositions[entity] = entity.Transform.Position;
 
-				// Undo/Redo: Start of drag session
-				_dragStartUndoPosition = _selectedEntity.Transform.Position;
+				_dragStartWorldMouse = camera.ScreenToWorldPoint(mousePos);
 			}
 		}
 
@@ -176,22 +211,24 @@ public class EntityPane
 			var worldMouse = camera.ScreenToWorldPoint(mousePos);
 			var delta = worldMouse - _dragStartWorldMouse;
 
-			if (_draggingX && _draggingY)
+			foreach (var entity in _selectedEntities)
 			{
-				ImGui.SetMouseCursor(ImGuiMouseCursor.ResizeAll);
-				_selectedEntity.Transform.Position = _dragStartEntityPos + delta;
-			}
-			else if (_draggingX)
-			{
-				ImGui.SetMouseCursor(ImGuiMouseCursor.ResizeEW);
-				_selectedEntity.Transform.Position = new Vector2(_dragStartEntityPos.X + delta.X,
-					_selectedEntity.Transform.Position.Y);
-			}
-			else if (_draggingY)
-			{
-				ImGui.SetMouseCursor(ImGuiMouseCursor.ResizeNS);
-				_selectedEntity.Transform.Position = new Vector2(_selectedEntity.Transform.Position.X,
-					_dragStartEntityPos.Y + delta.Y);
+				var startPos = _dragStartEntityPositions.TryGetValue(entity, out var pos) ? pos : entity.Transform.Position;
+				if (_draggingX && _draggingY)
+				{
+					ImGui.SetMouseCursor(ImGuiMouseCursor.ResizeAll);
+					entity.Transform.Position = startPos + delta;
+				}
+				else if (_draggingX)
+				{
+					ImGui.SetMouseCursor(ImGuiMouseCursor.ResizeEW);
+					entity.Transform.Position = new Vector2(startPos.X + delta.X, startPos.Y);
+				}
+				else if (_draggingY)
+				{
+					ImGui.SetMouseCursor(ImGuiMouseCursor.ResizeNS);
+					entity.Transform.Position = new Vector2(startPos.X, startPos.Y + delta.Y);
+				}
 			}
 		}
 
@@ -201,19 +238,23 @@ public class EntityPane
 			_draggingX = false;
 			_draggingY = false;
 
-			var endPos = _selectedEntity.Transform.Position;
-			if (_dragStartUndoPosition != endPos)
+			_dragEndEntityPositions = new Dictionary<Entity, Vector2>();
+			foreach (var entity in _selectedEntities)
+				_dragEndEntityPositions[entity] = entity.Transform.Position;
+
+			// Only push undo if any entity moved
+			bool anyMoved = _selectedEntities.Any(e => _dragStartEntityPositions[e] != _dragEndEntityPositions[e]);
+			if (anyMoved)
 			{
 				EditorChangeTracker.PushUndo(
-					new GenericValueChangeAction(
-						_selectedEntity.Transform,
-						(obj, val) => ((Transform)obj).SetPosition((Vector2)val),
-						_dragStartUndoPosition,
-						endPos,
-						$"{_selectedEntity.Name}.Transform.Position"
+					new MultiEntityTransformUndoAction(
+						_selectedEntities.ToList(),
+						_dragStartEntityPositions,
+						_dragEndEntityPositions,
+						$"Move {string.Join(", ", _selectedEntities.Select(e => e.Name))}"
 					),
-					_selectedEntity,
-					$"{_selectedEntity.Name}.Transform.Position"
+					_selectedEntities.First(),
+					$"Move {string.Join(", ", _selectedEntities.Select(e => e.Name))}"
 				);
 			}
 		}
@@ -246,7 +287,7 @@ public class EntityPane
         if (onlyDrawRoots && entity.Transform.Parent != null)
             return;
 
-        bool isSelected = entity == _selectedEntity;
+        bool isSelected = _selectedEntities.Contains(entity);
         ImGui.PushID((int)entity.Id);
         bool treeNodeOpened = false;
         var flags = isSelected ? ImGuiTreeNodeFlags.Selected : 0;
@@ -277,16 +318,13 @@ public class EntityPane
 			treeNodeOpened = ImGui.TreeNodeEx($"{entity.Name} ({entity.Transform.ChildCount})###{entity.Id}",
 				ImGuiTreeNodeFlags.Leaf | ImGuiTreeNodeFlags.OpenOnArrow | flags);
 
-		// Pop the color style if we pushed it
 		if (isPrefab || isHardCoded)
 		{
 			ImGui.PopStyleColor();
 		}
 
-
 		if (entity.Transform.ChildCount > 0)
 		{
-			// Check if the arrow was clicked (not the label)
 			if (ImGui.IsItemClicked(ImGuiMouseButton.Left) &&
 			    ImGui.GetMousePos().X - ImGui.GetItemRectMin().X <= ImGui.GetTreeNodeToLabelSpacing())
 			{
@@ -298,20 +336,21 @@ public class EntityPane
 		}
 		NezImGui.ShowContextMenuTooltip();
 
-		// Context menu for entity commands
 		ImGui.OpenPopupOnItemClick("entityContextMenu", ImGuiPopupFlags.MouseButtonRight);
 		DrawEntityContextMenuPopup(entity);
 
-		// Handle selection and inspector opening
 		if (ImGui.IsItemClicked(ImGuiMouseButton.Left) &&
-		    ImGui.GetMousePos().X - ImGui.GetItemRectMin().X > ImGui.GetTreeNodeToLabelSpacing())
+			ImGui.GetMousePos().X - ImGui.GetItemRectMin().X > ImGui.GetTreeNodeToLabelSpacing())
 		{
-			_imGuiManager.OpenMainEntityInspector(entity);
-			SelectedEntity = entity;
+			bool ctrlDown = Input.IsKeyDown(Keys.LeftControl) || Input.IsKeyDown(Keys.RightControl) || ImGui.GetIO().KeyCtrl || ImGui.GetIO().KeySuper;
+			bool shiftDown = Input.IsKeyDown(Keys.LeftShift) || Input.IsKeyDown(Keys.RightShift) || ImGui.GetIO().KeyShift;
+			SetSelectedEntity(entity, ctrlDown, shiftDown);
+			if (!ctrlDown)
+				_imGuiManager.OpenMainEntityInspector(entity);
+
 			ImGui.SetWindowFocus();
 		}
 
-		// Move camera to the entity for inspection
 		if (ImGui.IsMouseClicked(0) && ImGui.IsItemClicked() &&
 		    ImGui.GetMousePos().X - ImGui.GetItemRectMin().X > ImGui.GetTreeNodeToLabelSpacing())
             if (Core.Scene.Entities.Count > 0 && Core.IsEditMode)
@@ -495,55 +534,89 @@ public class EntityPane
 	    }
 
 	    // Ctrl+D: Duplicate selected
-	    if (Core.IsEditMode && gameCtrlDown && Input.IsKeyPressed(Keys.D) && _selectedEntity != null)
+	    if (Core.IsEditMode && gameCtrlDown && Input.IsKeyPressed(Keys.D) && _selectedEntities.Count > 0)
 	    {
-	        if (!ShouldBlockDuplication(_selectedEntity))
-	            DuplicateEntity(_selectedEntity);
+	        var entitiesToDuplicate = _selectedEntities.Where(e => !ShouldBlockDuplication(e)).ToList();
+	        if (entitiesToDuplicate.Count > 1)
+	        {
+	            DuplicateEntities(entitiesToDuplicate);
+	        }
+	        else
+	        {
+	            foreach (var entity in entitiesToDuplicate)
+	                DuplicateEntity(entity);
+	        }
 	    }
-	    else if (imguiCtrlDown && ImGui.IsKeyPressed(ImGuiKey.D) && _selectedEntity != null)
+	    else if (imguiCtrlDown && ImGui.IsKeyPressed(ImGuiKey.D) && _selectedEntities.Count > 0)
 	    {
-	        if (!ShouldBlockDuplication(_selectedEntity))
-	            DuplicateEntity(_selectedEntity);
-	    }
-
-	    // Ctrl+C: Copy (we can only copy in EditMode in game view)
-	    if (Core.IsEditMode && gameCtrlDown && Input.IsKeyPressed(Keys.C) && _copiedEntity != _selectedEntity)
-	    {
-	        if (!ShouldBlockDuplication(_selectedEntity))
-	            _copiedEntity = _selectedEntity;
-	    }
-	    else if (imguiCtrlDown && ImGui.IsKeyPressed(ImGuiKey.C) && _copiedEntity != _selectedEntity)
-	    {
-	        if (!ShouldBlockDuplication(_selectedEntity))
-	            _copiedEntity = _selectedEntity;
-	    }
-
-	    // Ctrl+V: Paste (duplicate)
-	    if (Core.IsEditMode && gameCtrlDown && Input.IsKeyPressed(Keys.V) && _copiedEntity != null)
-	    {
-	        if (!ShouldBlockDuplication(_selectedEntity))
-	            DuplicateEntity(_copiedEntity);
-	    }
-	    else if (imguiCtrlDown && ImGui.IsKeyPressed(ImGuiKey.V) && _copiedEntity != null)
-	    {
-	        if (!ShouldBlockDuplication(_selectedEntity))
-	            DuplicateEntity(_copiedEntity);
+	        var entitiesToDuplicate = _selectedEntities.Where(e => !ShouldBlockDuplication(e)).ToList();
+	        if (entitiesToDuplicate.Count > 1)
+	        {
+	            DuplicateEntities(entitiesToDuplicate);
+	        }
+	        else
+	        {
+	            foreach (var entity in entitiesToDuplicate)
+	                DuplicateEntity(entity);
+	        }
 	    }
 
-	    // Delete: Remove selected entity with Undo/Redo support
-	    if (Core.IsEditMode && _selectedEntity != null &&
+	    // Ctrl+C: Copy all selected entities
+	    if (Core.IsEditMode && gameCtrlDown && Input.IsKeyPressed(Keys.C) && _selectedEntities.Count > 0)
+	    {
+	        _copiedEntities = _selectedEntities.ToList();
+	    }
+	    else if (imguiCtrlDown && ImGui.IsKeyPressed(ImGuiKey.C) && _selectedEntities.Count > 0)
+	    {
+	        _copiedEntities = _selectedEntities.ToList();
+	    }
+
+	    // Ctrl+V: Paste (duplicate all copied entities)
+	    if (Core.IsEditMode && gameCtrlDown && Input.IsKeyPressed(Keys.V) && _copiedEntities.Count > 0)
+	    {
+	        var entitiesToDuplicate = _copiedEntities.Where(e => !ShouldBlockDuplication(e)).ToList();
+	        if (entitiesToDuplicate.Count > 1)
+	        {
+	            DuplicateEntities(entitiesToDuplicate);
+	        }
+	        else
+	        {
+	            foreach (var entity in entitiesToDuplicate)
+	                DuplicateEntity(entity);
+	        }
+	    }
+	    else if (imguiCtrlDown && ImGui.IsKeyPressed(ImGuiKey.V) && _copiedEntities.Count > 0)
+	    {
+	        var entitiesToDuplicate = _copiedEntities.Where(e => !ShouldBlockDuplication(e)).ToList();
+	        if (entitiesToDuplicate.Count > 1)
+	        {
+	            DuplicateEntities(entitiesToDuplicate);
+	        }
+	        else
+	        {
+	            foreach (var entity in entitiesToDuplicate)
+	                DuplicateEntity(entity);
+	        }
+	    }
+
+	    // Delete: Remove all selected entities with Undo/Redo support
+	    if (Core.IsEditMode && _selectedEntities.Count > 0 &&
 	        (Input.IsKeyPressed(Keys.Delete) || ImGui.IsKeyPressed(ImGuiKey.Delete)))
 	    {
-	        // Push undo BEFORE destroying, so the entity is still valid
+	        var entitiesToDelete = _selectedEntities.ToList();
+
+	        // Push a single undo for all entities
 	        EditorChangeTracker.PushUndo(
-	            new EntityCreateDeleteUndoAction(_selectedEntity.Scene, _selectedEntity, wasCreated: false, $"Deleted: {_selectedEntity.Name}"),
-	            _selectedEntity,
-	            $"Deleted: {_selectedEntity.Name}"
+	            new MultiEntityDeleteUndoAction(Core.Scene, entitiesToDelete, 
+	                $"Deleted: {string.Join(", ", entitiesToDelete.Select(e => e.Name))}"),
+	            entitiesToDelete.FirstOrDefault(),
+	            $"Deleted: {string.Join(", ", entitiesToDelete.Select(e => e.Name))}"
 	        );
-	        
-	        // Use Destroy() instead of DetachFromScene() to properly clean up components
-	        _selectedEntity.Destroy();
-	        SelectedEntity = null;
+
+	        foreach (var entity in entitiesToDelete)
+	            entity.Destroy();
+
+	        DeselectAllEntities();
 	    }
 	}
 
@@ -560,8 +633,11 @@ public class EntityPane
 		var typeName = entity.GetType().Name;
 		if (EntityFactoryRegistry.TryCreate(typeName, out var clone))
 		{
+			// Use unique name for each clone
+			string baseName = customName ?? entity.Name;
+			clone.Name = Core.Scene.GetUniqueEntityName(baseName, clone);
+
 			// Set up the clone with basic properties first
-			clone.Name = customName ?? Core.Scene.GetUniqueEntityName(entity.Name, entity);
 			clone.Transform.Position = entity.Transform.Position;
 			clone.Transform.Rotation = entity.Rotation;
 			clone.Transform.Scale = entity.Scale;
@@ -603,7 +679,7 @@ public class EntityPane
 							
 							// Serialize the source component data to JSON
 							var json = Json.ToJson(sourceComponent.Data, componentJsonSettings);
-							
+						
 							// Deserialize back to a new instance (deep clone)
 							var clonedData = (ComponentData)Json.FromJson(json, sourceComponent.Data.GetType());
 							
@@ -653,10 +729,10 @@ public class EntityPane
 								TypeNameHandling = TypeNameHandling.Auto,
 								PreserveReferencesHandling = false
 							};
-							
+						
 							// Serialize the source component data to JSON
 							var json = Json.ToJson(sourceComponent.Data, componentJsonSettings);
-							
+						
 							// Deserialize back to a new instance (deep clone)
 							var clonedData = (ComponentData)Json.FromJson(json, sourceComponent.Data.GetType());
 							
@@ -744,7 +820,7 @@ public class EntityPane
 				$"Created: {clone.Name}"
 			);
 
-			SelectedEntity = clone;
+			//SetSelectedEntity(clone);
 			_imGuiManager.MainEntityInspector.DelayedSetEntity(clone);
 			
 			return clone;
@@ -756,6 +832,197 @@ public class EntityPane
 				$"Did you forget to call EntityFactoryRegistry.Register(\"{typeName}\", ...)?");
 		}
 	}
+
+    /// <summary>
+    /// Duplicates the given entities and adds them to the scene.
+    /// Uses JSON serialization for reliable component copying.
+    /// </summary>
+    public List<Entity> DuplicateEntities(IEnumerable<Entity> entitiesToDuplicate)
+    {
+        var clones = new List<Entity>();
+
+        // First, create all clones and assign unique names considering both scene and pending clones
+        foreach (var entity in entitiesToDuplicate)
+        {
+            var typeName = entity.GetType().Name;
+            if (EntityFactoryRegistry.TryCreate(typeName, out var clone))
+            {
+                // Use the pending list for unique naming
+                clone.Name = Core.Scene.GetUniqueEntityName(entity.Name, clone, clones);
+
+                // Set up the clone with basic properties
+                clone.Transform.Position = entity.Transform.Position;
+                clone.Transform.Rotation = entity.Rotation;
+                clone.Transform.Scale = entity.Scale;
+                clone.SetTag(entity.Tag);
+                clone.Enabled = entity.Enabled;
+                clone.DebugRenderEnabled = entity.DebugRenderEnabled;
+                clone.UpdateInterval = entity.UpdateInterval;
+                clone.UpdateOrder = entity.UpdateOrder;
+
+                if (entity.Type == InstanceType.HardCoded || entity.Type == InstanceType.Dynamic)
+                    clone.Type = InstanceType.Dynamic;
+                else
+                {
+                    clone.Type = InstanceType.Prefab;
+                    clone.OriginalPrefabName = entity.OriginalPrefabName;
+                }
+
+                // Copy all components from the source entity BEFORE invoking EntityCreated
+                foreach (var sourceComponent in entity.Components)
+                {
+                    var existingComponent = clone.Components.FirstOrDefault(c =>
+                        c.GetType() == sourceComponent.GetType() && c.Name == sourceComponent.Name);
+
+                    if (existingComponent != null)
+                    {
+                        if (sourceComponent.Data != null)
+                        {
+                            try
+                            {
+                                var componentJsonSettings = new JsonSettings
+                                {
+                                    PrettyPrint = false,
+                                    TypeNameHandling = TypeNameHandling.Auto,
+                                    PreserveReferencesHandling = false
+                                };
+
+                                var json = Json.ToJson(sourceComponent.Data, componentJsonSettings);
+                                var clonedData = (ComponentData)Json.FromJson(json, sourceComponent.Data.GetType());
+                                existingComponent.Data = clonedData;
+                                existingComponent.Enabled = sourceComponent.Enabled;
+                            }
+                            catch (Exception ex)
+                            {
+                                System.Console.WriteLine($"Failed to copy data to existing component {sourceComponent.GetType().Name}: {ex.Message}");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        var componentType = sourceComponent.GetType();
+                        Component clonedComponent;
+                        try
+                        {
+                            clonedComponent = (Component)Activator.CreateInstance(componentType);
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Console.WriteLine($"Failed to create component {componentType.Name}: {ex.Message}");
+                            continue;
+                        }
+
+                        clonedComponent.Name = sourceComponent.Name;
+                        clonedComponent.Enabled = sourceComponent.Enabled;
+                        clone.AddComponent(clonedComponent);
+
+                        if (sourceComponent.Data != null)
+                        {
+                            try
+                            {
+                                var componentJsonSettings = new JsonSettings
+                                {
+                                    PrettyPrint = false,
+                                    TypeNameHandling = TypeNameHandling.Auto,
+                                    PreserveReferencesHandling = false
+                                };
+
+                                var json = Json.ToJson(sourceComponent.Data, componentJsonSettings);
+                                var clonedData = (ComponentData)Json.FromJson(json, sourceComponent.Data.GetType());
+                                clonedComponent.Data = clonedData;
+                            }
+                            catch (Exception ex)
+                            {
+                                System.Console.WriteLine($"Failed to copy data for component {sourceComponent.GetType().Name}: {ex.Message}");
+                                try
+                                {
+                                    var fallbackClone = sourceComponent.Clone();
+                                    if (fallbackClone != null && fallbackClone.Data != null)
+                                    {
+                                        clonedComponent.Data = fallbackClone.Data;
+                                    }
+                                }
+                                catch (Exception cloneEx)
+                                {
+                                    System.Console.WriteLine($"Clone() fallback also failed for {sourceComponent.GetType().Name}: {cloneEx.Message}");
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Call entity creation logic
+                EntityFactoryRegistry.InvokeEntityCreated(clone);
+
+                // Post-creation component data copy (for components that may be reset)
+                foreach (var sourceComponent in entity.Components)
+                {
+                    var targetComponent = clone.Components.FirstOrDefault(c =>
+                        c.GetType() == sourceComponent.GetType() && c.Name == sourceComponent.Name);
+
+                    if (targetComponent != null && sourceComponent.Data != null)
+                    {
+                        try
+                        {
+                            var componentJsonSettings = new JsonSettings
+                            {
+                                PrettyPrint = false,
+                                TypeNameHandling = TypeNameHandling.Auto,
+                                PreserveReferencesHandling = false
+                            };
+
+                            var json = Json.ToJson(sourceComponent.Data, componentJsonSettings);
+                            var clonedData = (ComponentData)Json.FromJson(json, sourceComponent.Data.GetType());
+                            targetComponent.Data = clonedData;
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Console.WriteLine($"Failed post-creation data copy for {sourceComponent.GetType().Name}: {ex.Message}");
+                        }
+                    }
+                }
+
+                // Copy children if any exist, but SKIP HardCoded entities
+                for (var i = 0; i < entity.Transform.ChildCount; i++)
+                {
+                    var childEntity = entity.Transform.GetChild(i).Entity;
+                    if (childEntity.Type == Entity.InstanceType.HardCoded)
+                        continue;
+
+                    var clonedChild = DuplicateEntity(childEntity, null);
+                    if (clonedChild != null)
+                    {
+                        clonedChild.Transform.SetParent(clone.Transform);
+                    }
+                }
+
+                clones.Add(clone);
+            }
+        }
+
+        // Add all clones to the scene after naming
+        foreach (var clone in clones)
+            Core.Scene.AddEntity(clone);
+
+        return clones;
+	}
 	#endregion
 
+    public void DeselectAllEntities()
+    {
+        _selectedEntities.Clear();
+    }
+
+    public Vector2 GetSelectedEntitiesCenter()
+    {
+        if (SelectedEntities.Count == 0)
+            return Core.Scene.Camera.Position;        
+
+        Vector2 sum = Vector2.Zero;
+
+        foreach (var e in SelectedEntities)
+            sum += e.Transform.Position;
+
+        return sum / SelectedEntities.Count;
+    }
 }

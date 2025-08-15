@@ -99,6 +99,9 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	private Task _pendingSaveTask = null;
 	private ExitPromptType _pendingActionAfterSave;
 
+	private bool ctrlDown; 
+	private bool shiftDown;
+
 	#region Event Handlers
 
 	/// <summary>
@@ -295,7 +298,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		
 		if (ImGui.GetIO().KeyCtrl && ImGui.IsKeyPressed(ImGuiKey.S, false))
 			InvokeSaveSceneChanges();
-		
+
 		// This triggers the same exit/save prompt as the window close event
 #if OS_WINDOWS || LINUX
 		if (ImGui.GetIO().KeyAlt && ImGui.IsKeyPressed(ImGuiKey.F4, false) && !_pendingExit)
@@ -304,7 +307,11 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		if (ImGui.GetIO().KeySuper && ImGui.IsKeyPressed(ImGuiKey.Q, false) && !_pendingExit)
 			OnAppExitSaveChanges(true); 
 #endif
+
+		ctrlDown = Input.IsKeyDown(Keys.LeftControl) || Input.IsKeyDown(Keys.RightControl) || ImGui.GetIO().KeyCtrl || ImGui.GetIO().KeySuper;
+		shiftDown = Input.IsKeyDown(Keys.LeftShift) || Input.IsKeyDown(Keys.RightShift) || ImGui.GetIO().KeyShift;
 	}
+
 	private void ManageUndoAndRedo()
 	{
 		if (ImGui.GetIO().KeyCtrl && ImGui.IsKeyPressed(ImGuiKey.Z, false))
@@ -494,19 +501,19 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 			Core.Scene.Camera.Position = Vector2.Lerp(Core.Scene.Camera.Position, _cameraTargetPosition, _cameraLerp);
 		}
 
+		// Double-click selection logic (keep inside ImGui window hovered check)
 		if (ImGui.IsWindowHovered(ImGuiHoveredFlags.AnyWindow))
 		{
-			// Double-click selection logic
 			if (ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
 			{
 				TrySelectEntityAtMouse();
 			}
-			// Single click anywhere in game view: deselect if something is selected and not dragging gizmo
-			else if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
+			else if (!ctrlDown && !shiftDown && (Input.LeftMouseButtonPressed || ImGui.IsMouseClicked(ImGuiMouseButton.Left)))
 			{
-				var entityPane = SceneGraphWindow.EntityPane;
-				if (entityPane.SelectedEntity != null && !entityPane.IsDraggingGizmo)
+				// Only deselect if not clicking on an entity node and not dragging gizmo
+				if (!SceneGraphWindow.EntityPane.IsDraggingGizmo)
 				{
+					SceneGraphWindow.EntityPane.DeselectAllEntities();
 					DeselectEntity();
 				}
 			}
@@ -526,7 +533,6 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 				_dynamicCameraSpeed = MathHelper.Clamp(_dynamicCameraSpeed + speedDelta, 
 													   EditModeCameraMinSpeed, 
 													   EditModeCameraMaxSpeed);
-				
 			}
 			else
 			{
@@ -753,7 +759,8 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	    // Set selection in the editor
 	    if (selected != null)
 	    {
-	        SceneGraphWindow.EntityPane.SelectedEntity = selected;
+	        // Detect modifiers
+	        SceneGraphWindow.EntityPane.SetSelectedEntity(selected, ctrlDown, shiftDown);
 	        OpenMainEntityInspector(selected);
 
 	        // Move camera to the selected entity
@@ -763,14 +770,13 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	
 	public void SetCameraTargetPosition(Vector2 position)
 	{
-		// Smoothly move camera to the selected entity's position
-		_cameraTargetPosition = position;
+		_cameraTargetPosition = SceneGraphWindow.EntityPane.GetSelectedEntitiesCenter();
 	}
 
 	public void DeselectEntity()
 	{
 		if (SceneGraphWindow?.EntityPane != null)
-		    SceneGraphWindow.EntityPane.SelectedEntity = null;
+		    SceneGraphWindow.EntityPane.SetSelectedEntity(null, false);
 	}
 	#endregion
 

@@ -7,6 +7,7 @@ using Nez.Utils;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Nez.Editor;
 using Num = System.Numerics;
@@ -211,6 +212,11 @@ public class SceneGraphWindow
 		}
 
 		HandleEntitySelectionNavigation();
+
+		if (ImGui.IsMouseClicked(ImGuiMouseButton.Left) && !ImGui.IsAnyItemHovered())
+		{
+			EntityPane.DeselectAllEntities();
+		}
 	}
 
 	private void DrawEntitySelectorPopup()
@@ -489,7 +495,7 @@ public class SceneGraphWindow
 					$"Create Entity from Prefab {entity.Name}"
 				);
 
-				_imGuiManager.SceneGraphWindow.EntityPane.SelectedEntity = entity;
+				_imGuiManager.SceneGraphWindow.EntityPane.SetSelectedEntity(entity, false);
 				_imGuiManager.MainEntityInspector.DelayedSetEntity(entity);
 
 				NotificationSystem.ShowTimedNotification($"Created entity from prefab: {prefabName}");
@@ -531,7 +537,7 @@ public class SceneGraphWindow
 			var imGuiManager = Core.GetGlobalManager<ImGuiManager>();
 			if (imGuiManager != null)
 			{
-				imGuiManager.SceneGraphWindow.EntityPane.SelectedEntity = entity;
+				imGuiManager.SceneGraphWindow.EntityPane.SetSelectedEntity(entity, false);
 				_imGuiManager.MainEntityInspector.DelayedSetEntity(entity);
 			}
 		}
@@ -540,7 +546,11 @@ public class SceneGraphWindow
 	#region Entity Selection Navigation
 	private void HandleEntitySelectionNavigation()
 	{
-		if (!Core.IsEditMode || EntityPane.SelectedEntity == null || !ImGui.IsWindowFocused(ImGuiFocusedFlags.AnyWindow))
+		// Use the first selected entity for navigation
+		var selectedEntities = EntityPane.SelectedEntities;
+		var selectedEntity = selectedEntities.FirstOrDefault();
+
+		if (!Core.IsEditMode || selectedEntity == null || !ImGui.IsWindowFocused(ImGuiFocusedFlags.AnyWindow))
 			return; 
 
 		var hierarchyList = BuildHierarchyList();
@@ -564,7 +574,7 @@ public class SceneGraphWindow
 			if (next != null)
 			{
 				_imGuiManager.OpenMainEntityInspector(next);
-				_entityPane.SelectedEntity = next;
+				EntityPane.SetSelectedEntity(next, false);
 				ExpandParentsAndChildren(next);
 				_imGuiManager.SetCameraTargetPosition(next.Transform.Position);
 			}
@@ -578,7 +588,7 @@ public class SceneGraphWindow
 				if (next != null)
 				{
 					_imGuiManager.OpenMainEntityInspector(next);
-					_entityPane.SelectedEntity = next;
+					EntityPane.SetSelectedEntity(next, false);
 					ExpandParentsAndChildren(next);
 					_imGuiManager.SetCameraTargetPosition(next.Transform.Position);
 				}
@@ -598,7 +608,7 @@ public class SceneGraphWindow
 			if (next != null)
 			{
 				_imGuiManager.OpenMainEntityInspector(next);
-				_entityPane.SelectedEntity = next;
+				EntityPane.SetSelectedEntity(next, false);
 				ExpandParentsAndChildren(next);
 				_imGuiManager.SetCameraTargetPosition(next.Transform.Position); 
 			}
@@ -612,7 +622,7 @@ public class SceneGraphWindow
 				if (next != null)
 				{
 					_imGuiManager.OpenMainEntityInspector(next);
-					_entityPane.SelectedEntity = next;
+					EntityPane.SetSelectedEntity(next, false);
 					ExpandParentsAndChildren(next);
 					_imGuiManager.SetCameraTargetPosition(next.Transform.Position);
 				}
@@ -625,7 +635,7 @@ public class SceneGraphWindow
 		}
 	}
 
-	private List<Entity> BuildHierarchyList()
+	public List<Entity> BuildHierarchyList()
 	{
 		var result = new List<Entity>();
 		var entities = Core.Scene?.Entities;
