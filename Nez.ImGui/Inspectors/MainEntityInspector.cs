@@ -161,17 +161,22 @@ public class MainEntityInspector
 		_selectedEntities = _imguiManager.SceneGraphWindow.EntityPane.SelectedEntities.ToList();
 
 		var windowPosX = Screen.Width - _mainInspectorWidth;
-		var windowPosY = MainEntityInspector.MainInspectorPosY;
+		var windowPosY = MainInspectorPosY;
 		var windowWidth = _mainInspectorWidth;
 		var windowHeight = Screen.Height - MainInspectorPosY;
 
-		ImGui.SetNextWindowPos(new Num.Vector2(windowPosX, windowPosY), ImGuiCond.Once);
-		ImGui.SetNextWindowSize(new Num.Vector2(windowWidth, windowHeight), ImGuiCond.Once);
+		ImGui.SetNextWindowPos(new Num.Vector2(windowPosX, windowPosY), ImGuiCond.FirstUseEver);
+		ImGui.SetNextWindowSize(new Num.Vector2(windowWidth, windowHeight), ImGuiCond.FirstUseEver);
 
 		var open = IsOpen;
 
 		if (ImGui.Begin("##MainEntityInspector", ref open, windowFlags))
 		{
+			// Always update width, regardless of entity selection
+			var currentWidth = ImGui.GetWindowSize().X;
+			if (Math.Abs(currentWidth - _mainInspectorWidth) > 0.01f)
+				_mainInspectorWidth = Math.Clamp(currentWidth, _minInspectorWidth, _maxInspectorWidth);
+
 			// 1) Show "Multiple Entities Selected" if more than one entity is selected
 			if (_selectedEntities.Count > 1)
 			{
@@ -195,11 +200,6 @@ public class MainEntityInspector
 				ImGui.Text(entityName);
 				ImGui.SetWindowFontScale(1.0f);
 				NezImGui.BigVerticalSpace();
-
-				// Always update width, regardless of entity selection
-				var currentWidth = ImGui.GetWindowSize().X;
-				if (Math.Abs(currentWidth - _mainInspectorWidth) > 0.01f)
-					_mainInspectorWidth = Math.Clamp(currentWidth, _minInspectorWidth, _maxInspectorWidth);
 
 				if (Entity == null)
 				{

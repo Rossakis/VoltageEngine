@@ -79,6 +79,14 @@ namespace Nez.ImGuiTools.Inspectors.CustomInspectors
                 {
                     ImGui.TextColored(new Num.Vector4(1, 1, 0, 1), "Select an AnimatedSprite to Manage its events");
                     ImGui.End();
+                    // Handle window close when no animator is selected
+                    if (!open)
+                    {
+                        var imGuiManager = Core.GetGlobalManager<ImGuiManager>();
+                        imGuiManager.ShowAnimationEventInspector = false;
+                        imGuiManager.UnregisterDrawCommand(Draw);
+                        SpriteAnimatorFileInspector.AnimationEventInspectorInstance = null;
+                    }
                     return;
                 }
 
@@ -360,10 +368,11 @@ namespace Nez.ImGuiTools.Inspectors.CustomInspectors
             }
             ImGui.End();
 
+            // Handle window close when animator is selected
             if (!open)
             {
                 var imGuiManager = Core.GetGlobalManager<ImGuiManager>();
-                imGuiManager.ShowAnimationEventInspector = false; // Ensure the flag is reset
+                imGuiManager.ShowAnimationEventInspector = false;
                 imGuiManager.UnregisterDrawCommand(Draw);
                 SpriteAnimatorFileInspector.AnimationEventInspectorInstance = null;
             }

@@ -13,6 +13,9 @@ using Nez.ImGuiTools.UndoActions;
 
 namespace Nez.ImGuiTools;
 
+/// <summary>
+/// Manages the ImGui game window specifically
+/// </summary>
 public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDisposable
 {
 	private const string kShowStyleEditor = "ImGui_ShowStyleEditor";
@@ -85,6 +88,33 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		_lastRenderTarget = null;
 	}
 
+	private void ManualWindowResize(System.Numerics.Vector2 maxSize, System.Numerics.Vector2 minSize, float rtAspectRatio)
+	{
+		unsafe
+		{
+			ImGui.SetNextWindowSizeConstraints(minSize, maxSize, data =>
+			{
+				var aspect = rtAspectRatio;
+				var size = (*data).CurrentSize;
+				var desired = (*data).DesiredSize;
+		
+				// Calculate which axis changed more
+				float widthFromHeight = desired.Y * aspect;
+				float heightFromWidth = desired.X / aspect;
+		
+				// If user changed width more, lock height to width
+				if (Math.Abs(desired.X - size.X) > Math.Abs(desired.Y - size.Y))
+				{
+					(*data).DesiredSize.Y = heightFromWidth;
+				}
+				else
+				{
+					(*data).DesiredSize.X = widthFromHeight;
+				}
+			});
+		}
+	}
+
 	/// <summary>
 	/// draws the game window and deals with overriding Nez.Input when appropriate
 	/// </summary>
@@ -94,64 +124,36 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 			return;
 
 		var rtAspectRatio = (float)_lastRenderTarget.Width / (float)_lastRenderTarget.Height;
-		var maxSize = new Num.Vector2(_lastRenderTarget.Width, _lastRenderTarget.Height);
-		if (maxSize.X >= Screen.Width || maxSize.Y >= Screen.Height)
-		{
-			maxSize.X = Screen.Width * 0.8f;
-			maxSize.Y = maxSize.X / rtAspectRatio;
-		}
-
-		var minSize = maxSize / 4;
-		maxSize *= 4;
-		unsafe
-		{
-			ImGui.SetNextWindowSizeConstraints(minSize, maxSize, data =>
-			{
-				var size = (*data).CurrentSize;
-				var ratio = size.X / _lastRenderTarget.Width;
-				(*data).DesiredSize.Y = ratio * _lastRenderTarget.Height;
-			});
-		}
 
 		// Adjust game window size based on available panels around it
-		if (MainEntityInspector != null && SceneGraphWindow.IsOpen)
-		{
-			var finalWidth = Screen.Width - SceneGraphWindow.SceneGraphWidth - MainEntityInspector.MainInspectorWidth;
-			var finalPos = new Num.Vector2(SceneGraphWindow.SceneGraphWidth, SceneGraphWindow.SceneGraphPosY);
+		float left = SceneGraphWindow.IsOpen ? SceneGraphWindow.SceneGraphWidth : 0f;
+		float right = MainEntityInspector != null ? Screen.Width - MainEntityInspector.MainInspectorWidth : Screen.Width;
+		float availableWidth = right - left;
+		float posX = left;
+		float posY = Math.Max(SceneGraphWindow.SceneGraphPosY, MainEntityInspector.MainInspectorPosY);
 
-			ImGui.SetNextWindowPos(finalPos, ImGuiCond.Always);
-			ImGui.SetNextWindowSize(new Num.Vector2(finalWidth, Screen.Width / 2 / rtAspectRatio),
-				ImGuiCond.Always);
-		}
-		else if (MainEntityInspector == null && SceneGraphWindow.IsOpen)
-		{
-			var finalWidth = Screen.Width - SceneGraphWindow.SceneGraphWidth;
-			var finalPos = new Num.Vector2(SceneGraphWindow.SceneGraphWidth, SceneGraphWindow.SceneGraphPosY);
+		// Use all available width, and scale height to maintain aspect ratio
+		float gameWindowWidth = availableWidth;
+		float gameWindowHeight = gameWindowWidth / rtAspectRatio;
 
-			ImGui.SetNextWindowPos(finalPos, ImGuiCond.Always);
-			ImGui.SetNextWindowSize(new Num.Vector2(finalWidth, Screen.Width / 2 / rtAspectRatio),
-				ImGuiCond.Always);
-		}
-		else if (MainEntityInspector != null && !SceneGraphWindow.IsOpen)
+		// Clamp height to available vertical space if needed
+		float maxHeight = Screen.Height - posY;
+		if (gameWindowHeight > maxHeight)
 		{
-			var finalWidth = Screen.Width - MainEntityInspector.MainInspectorWidth;
-			var finalPos = new Num.Vector2(0, MainEntityInspector.MainInspectorPosY);
+			gameWindowHeight = maxHeight;
+			gameWindowWidth = gameWindowHeight * rtAspectRatio;
+			posX = left + (availableWidth - gameWindowWidth) / 2f;
+		}
 
-			ImGui.SetNextWindowPos(finalPos, ImGuiCond.Always);
-			ImGui.SetNextWindowSize(new Num.Vector2(finalWidth, Screen.Width / 2 / rtAspectRatio),
-				ImGuiCond.Always);
-		}
-		else
-		{
-			ImGui.SetNextWindowPos(_gameWindowFirstPosition, ImGuiCond.FirstUseEver);
-			ImGui.SetNextWindowSize(new Num.Vector2(Screen.Width / 2, Screen.Width / 2 / rtAspectRatio),
-				ImGuiCond.FirstUseEver);
-		}
+		ImGui.SetNextWindowPos(new Num.Vector2(posX, posY), ImGuiCond.Always);
+		ImGui.SetNextWindowSize(new Num.Vector2(gameWindowWidth, gameWindowHeight), ImGuiCond.Always);
 
 		HandleForcedGameViewParams();
 
+		string gameWindowState = Core.IsEditMode ? "Paused" : "Playing";
+
 		ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Num.Vector2(0, 0));
-		ImGui.Begin(_gameWindowTitle, _gameWindowFlags);
+		ImGui.Begin($"Game: {gameWindowState}###{_gameWindowTitle}", _gameWindowFlags);
 
 		GameWindowWidth = ImGui.GetWindowSize().X;
 		GameWindowHeight = ImGui.GetWindowSize().Y;
@@ -279,7 +281,6 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		}
 
 		ImGui.End();
-
 		ImGui.PopStyleVar();
 	}
 
@@ -552,8 +553,11 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 				_renderTargetId = _renderer.BindTexture(source);
 			}
 
-			// we cant draw the game window until we have the texture bound so we append it here
-			ImGui.Begin(_gameWindowTitle, _gameWindowFlags);
+			// Use the same window name as DrawGameWindow
+			string gameWindowState = Core.IsEditMode ? "Paused" : "Playing";
+			string windowTitle = $"Game: {gameWindowState}###{_gameWindowTitle}";
+
+			ImGui.Begin(windowTitle, _gameWindowFlags);
 			ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, Num.Vector2.Zero);
 			ImGui.ImageButton("SeparateGameWindowImageButton", _renderTargetId, ImGui.GetContentRegionAvail());
 			ImGui.PopStyleVar();
