@@ -281,6 +281,9 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		// Delegate entity selection logic to the manager
 		_cursorSelectionManager.UpdateSelection();
 
+		// Highlight all selected entities
+		DrawSelectedEntityOutlines();
+
 		if (ShowAnimationEventInspector)
 		{
 			if (_animationEventInspector == null)
@@ -782,5 +785,47 @@ public IntPtr BindTexture(Texture2D texture)
 		}
 
 		ShowAnimationEventInspector = true;
+	}
+
+	private List<(Entity entity, Collider collider)> _highlightedEntities = new();
+	private IReadOnlyList<Entity> _lastSelectedEntities = null;
+
+	public void DrawSelectedEntityOutlines()
+	{
+		var selectedEntities = SceneGraphWindow.EntityPane.SelectedEntities;
+
+		// Only update cache if selection changed
+		if (_lastSelectedEntities == null || !selectedEntities.SequenceEqual(_lastSelectedEntities))
+		{
+			_highlightedEntities.Clear();
+			foreach (var entity in selectedEntities)
+			{
+				var collider = entity.GetComponent<Collider>();
+				_highlightedEntities.Add((entity, collider));
+			}
+			_lastSelectedEntities = selectedEntities.ToList();
+		}
+
+		// Draw highlights using cached info
+		foreach (var (entity, collider) in _highlightedEntities)
+		{
+			RectangleF bounds;
+			if (collider != null)
+			{
+				bounds = collider.Bounds;
+			}
+			else
+			{
+				var pos = entity.Transform.Position;
+				bounds = new RectangleF(pos.X - 8, pos.Y - 8, 16, 16);
+			}
+			Debug.DrawHollowRect(bounds, Color.Yellow);
+		}
+	}
+
+	public void ClearHighlightCache()
+	{
+	    _highlightedEntities.Clear();
+	    _lastSelectedEntities = null;
 	}
 }

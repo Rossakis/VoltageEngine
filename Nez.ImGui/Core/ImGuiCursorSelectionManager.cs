@@ -58,28 +58,38 @@ namespace Nez.ImGuiTools
 
             if (ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
             {
+                // Only clear selection if no modifier is pressed
+                if (!_ctrlDown && !_shiftDown)
+                    DeselectEntity();
+
                 TrySelectEntityAtMouse();
                 _isBoxSelecting = false;
             }
-            else if (Input.LeftMouseButtonPressed && !_draggingX && !_draggingY && !IsMouseOverGizmo)
+            else if (Input.LeftMouseButtonPressed && !_draggingX && !_draggingY && !IsMouseOverGizmo && !_ctrlDown && !_shiftDown)
             {
-                _imGuiManager.SceneGraphWindow.EntityPane.DeselectAllEntities();
                 DeselectEntity();
-            }
+			}
         }
 
         private void UpdateModifierKeys()
         {
-            _ctrlDown = Input.IsKeyDown(Keys.LeftControl) || Input.IsKeyDown(Keys.RightControl) || ImGui.GetIO().KeyCtrl || ImGui.GetIO().KeySuper;
-            _shiftDown = Input.IsKeyDown(Keys.LeftShift) || Input.IsKeyDown(Keys.RightShift) || ImGui.GetIO().KeyShift;
-        }
+            _ctrlDown = ImGui.GetIO().KeyCtrl || ImGui.GetIO().KeySuper;
+            _shiftDown = ImGui.GetIO().KeyShift;
+		}
 
-        private void HandleBoxSelection()
+		private void HandleBoxSelection()
         {
             mouseScreen = Core.Scene.Camera.ScreenToWorldPoint(Input.ScaledMousePosition);
 
             if (!_isBoxSelecting && Input.LeftMouseButtonPressed)
             {
+                // Only clear previous selection if no modifier is pressed
+                if (!_ctrlDown && !_shiftDown)
+                {
+                    _imGuiManager.SceneGraphWindow.EntityPane.DeselectAllEntities();
+                    DeselectEntity();
+                }
+
                 _isBoxSelecting = true;
                 _boxSelectStartWorld = Core.Scene.Camera.ScreenToWorldPoint(mouseScreen);
                 _boxSelectEndWorld = _boxSelectStartWorld;
@@ -99,35 +109,34 @@ namespace Nez.ImGuiTools
             }
         }
 
-        private RectangleF GetBoxSelectionRectangle(Vector2 worldStart, Vector2 worldEnd)
-        {
-            var camera = Core.Scene.Camera;
-            var screenStart = camera.WorldToScreenPoint(worldStart);
-            var screenEnd = camera.WorldToScreenPoint(worldEnd);
-
-            var min = new Vector2(Math.Min(screenStart.X, screenEnd.X), Math.Min(screenStart.Y, screenEnd.Y));
-            var max = new Vector2(Math.Max(screenStart.X, screenEnd.X), Math.Max(screenStart.Y, screenEnd.Y));
-
-            return new RectangleF(min.X, min.Y, max.X - min.X, max.Y - min.Y);
-        }
-
         private void DrawSelectionBoxNez(Vector2 worldStart, Vector2 worldEnd)
         {
-            Debug.DrawRect(GetBoxSelectionRectangle(worldStart, worldEnd), Color.CornflowerBlue * 0.7f, 0f);
+            var camera = Core.Scene.Camera;
+            var min = new Vector2(Math.Min(worldStart.X, worldEnd.X), Math.Min(worldStart.Y, worldEnd.Y));
+            var max = new Vector2(Math.Max(worldStart.X, worldEnd.X), Math.Max(worldStart.Y, worldEnd.Y));
+            var rect = new RectangleF(min.X, min.Y, max.X - min.X, max.Y - min.Y);
+            Debug.DrawRect(camera.WorldToScreenRect(rect), Color.CornflowerBlue * 0.7f, 0f);
         }
 
         private void SelectEntitiesInBox(Vector2 worldStart, Vector2 worldEnd)
         {
-            var selectionRect = GetBoxSelectionRectangle(worldStart, worldEnd);
+            var camera = Core.Scene.Camera;
+            var min = new Vector2(Math.Min(worldStart.X, worldEnd.X), Math.Min(worldStart.Y, worldEnd.Y));
+            var max = new Vector2(Math.Max(worldStart.X, worldEnd.X), Math.Max(worldStart.Y, worldEnd.Y));
+            var rect = new RectangleF(min.X, min.Y, max.X - min.X, max.Y - min.Y);
+            var selectionRect = camera.WorldToScreenRect(rect);
             var selectedEntities = new List<Entity>();
 
             for (int i = Core.Scene.Entities.Count - 1; i >= 0; i--)
             {
                 var entity = Core.Scene.Entities[i];
-
                 var sprite = entity.GetComponent<SpriteRenderer>();
                 var collider = entity.GetComponent<Collider>();
+
                 if (sprite == null && collider == null)
+                    continue;
+
+                if (sprite != null && !sprite.IsSelectableInEditor)
                     continue;
 
                 RectangleF entityBounds = GetEntityBounds(entity);
@@ -135,26 +144,26 @@ namespace Nez.ImGuiTools
                 if (entityBounds.Width <= 0 || entityBounds.Height <= 0)
                     continue;
 
-                float intersectX = Math.Max(selectionRect.X, entityBounds.X);
-                float intersectY = Math.Max(selectionRect.Y, entityBounds.Y);
-                float intersectRight = Math.Min(selectionRect.X + selectionRect.Width, entityBounds.X + entityBounds.Width);
-                float intersectBottom = Math.Min(selectionRect.Y + selectionRect.Height, entityBounds.Y + entityBounds.Height);
-
-                float intersectWidth = intersectRight - intersectX;
-                float intersectHeight = intersectBottom - intersectY;
-
-                if (intersectWidth > 0 && intersectHeight > 0)
+                if (selectionRect.Intersects(entityBounds))
                 {
-                    float intersectionArea = intersectWidth * intersectHeight;
-                    float entityArea = entityBounds.Width * entityBounds.Height;
-                    float coverage = intersectionArea / entityArea;
+                    float intersectX = Math.Max(selectionRect.X, entityBounds.X);
+                    float intersectY = Math.Max(selectionRect.Y, entityBounds.Y);
+                    float intersectRight = Math.Min(selectionRect.X + selectionRect.Width, entityBounds.X + entityBounds.Width);
+                    float intersectBottom = Math.Min(selectionRect.Y + selectionRect.Height, entityBounds.Y + entityBounds.Height);
 
-                    if (coverage >= 0.7f)
+                    float intersectWidth = intersectRight - intersectX;
+                    float intersectHeight = intersectBottom - intersectY;
+
+                    if (intersectWidth > 0 && intersectHeight > 0)
                     {
-                        if (sprite != null && !sprite.IsSelectableInEditor)
-                            continue;
+                        float intersectionArea = intersectWidth * intersectHeight;
+                        float entityArea = entityBounds.Width * entityBounds.Height;
+                        float coverage = intersectionArea / entityArea;
 
-                        selectedEntities.Add(entity);
+                        if (coverage >= 0.4f)
+                        {
+                            selectedEntities.Add(entity);
+                        }
                     }
                 }
             }
@@ -162,30 +171,39 @@ namespace Nez.ImGuiTools
             if (selectedEntities.Count > 0)
             {
                 var entityPane = _imGuiManager.SceneGraphWindow.EntityPane;
-                entityPane.DeselectAllEntities();
+                // Only clear selection if no modifier is held
+                bool additive = _ctrlDown || _shiftDown;
+                if (!additive)
+                    entityPane.DeselectAllEntities();
+
+                // Add all entities in rectangle to selection
                 foreach (var entity in selectedEntities)
-                    entityPane.SetSelectedEntity(entity, _ctrlDown, true);
+                    entityPane.SetSelectedEntity(entity, true, false); // always additive when rectangle + modifier
 
                 _imGuiManager.OpenMainEntityInspector(selectedEntities[0]);
                 SetCameraTargetPosition(selectedEntities[0].Transform.Position);
             }
         }
 
-        private RectangleF GetEntityBounds(Entity entity)
+        private RectangleF GetEntityBounds(Entity entity, bool isSpriteSelectionOn = false)
         {
             var collider = entity.GetComponent<Collider>();
             if (collider != null)
                 return collider.Bounds;
 
-            var sprite = entity.GetComponent<SpriteRenderer>();
-            if (sprite != null)
-                return sprite.Bounds;
+			// Sprite selection will not be supported with SelectEntitiesInBox
+			if (isSpriteSelectionOn)
+			{
+				var sprite = entity.GetComponent<SpriteRenderer>();
+				if (sprite != null)
+					return sprite.Bounds;
+			}
 
-            var pos = entity.Transform.Position;
+			var pos = entity.Transform.Position;
             return new RectangleF(pos.X - 8, pos.Y - 8, 16, 16);
         }
 
-        private bool TrySelectEntityAtMouse()
+        private void TrySelectEntityAtMouse()
         {
             var mouseWorld = Core.Scene.Camera.ScreenToWorldPoint(Input.ScaledMousePosition);
             Entity selected = null;
@@ -234,17 +252,20 @@ namespace Nez.ImGuiTools
 
             if (selected != null)
             {
-                _imGuiManager.SceneGraphWindow.EntityPane.SetSelectedEntity(selected, _ctrlDown, _shiftDown);
+                // Treat Shift as Control for game window selection
+                bool additive = _ctrlDown || _shiftDown;
+                _imGuiManager.SceneGraphWindow.EntityPane.SetSelectedEntity(selected, additive, false);
+
                 _imGuiManager.OpenMainEntityInspector(selected);
                 SetCameraTargetPosition(selected.Transform.Position);
-                return true;
             }
-            return false;
         }
 
         public void DeselectEntity()
         {
-            if (_imGuiManager.SceneGraphWindow?.EntityPane != null)
+	        _imGuiManager.SceneGraphWindow.EntityPane.DeselectAllEntities();
+
+			if (_imGuiManager.SceneGraphWindow?.EntityPane != null)
                 _imGuiManager.SceneGraphWindow.EntityPane.SetSelectedEntity(null, false);
         }
 

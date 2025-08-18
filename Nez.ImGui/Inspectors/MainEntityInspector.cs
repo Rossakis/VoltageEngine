@@ -183,6 +183,17 @@ public class MainEntityInspector
 				ImGui.SetWindowFontScale(1.5f);
 				ImGui.Text("Multiple Entities Selected");
 				ImGui.SetWindowFontScale(1.0f);
+
+				// Show list of selected entity names in small font
+				ImGui.PushFont(ImGui.GetIO().FontDefault); // Use default font (smallest)
+				ImGui.PushStyleColor(ImGuiCol.Text, new Num.Vector4(0.8f, 0.8f, 0.8f, 1.0f));
+				for (int i = 0; i < _selectedEntities.Count; i++)
+				{
+					ImGui.Text($"{i + 1}. {_selectedEntities[i].Name}");
+				}
+				ImGui.PopStyleColor();
+				ImGui.PopFont();
+
 				NezImGui.BigVerticalSpace();
 
 				// 2) Show common components

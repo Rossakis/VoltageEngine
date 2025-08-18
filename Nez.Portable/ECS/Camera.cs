@@ -502,6 +502,21 @@ namespace Nez
 			return worldPosition;
 		}
 
+		public Rectangle WorldToScreenRect(RectangleF worldRect)
+		{
+			// Transform top-left and bottom-right corners
+			var topLeft = WorldToScreenPoint(new Vector2(worldRect.X, worldRect.Y));
+			var bottomRight = WorldToScreenPoint(new Vector2(worldRect.X + worldRect.Width, worldRect.Y + worldRect.Height));
+
+			// Calculate screen-space rectangle
+			int x = (int)Math.Round(Math.Min(topLeft.X, bottomRight.X));
+			int y = (int)Math.Round(Math.Min(topLeft.Y, bottomRight.Y));
+			int width = (int)Math.Round(Math.Abs(bottomRight.X - topLeft.X));
+			int height = (int)Math.Round(Math.Abs(bottomRight.Y - topLeft.Y));
+
+			return new Rectangle(x, y, width, height);
+		}
+
 
 		/// <summary>
 		/// converts a point from screen coordinates to world
