@@ -213,7 +213,9 @@ public class SceneGraphWindow
 
 		HandleEntitySelectionNavigation();
 
-		if (ImGui.IsMouseClicked(ImGuiMouseButton.Left) && !ImGui.IsAnyItemHovered())
+		if (ImGui.IsMouseClicked(ImGuiMouseButton.Left)
+		    && !ImGui.IsAnyItemHovered()
+		    && ImGui.IsWindowFocused(ImGuiFocusedFlags.RootAndChildWindows))
 		{
 			EntityPane.DeselectAllEntities();
 		}

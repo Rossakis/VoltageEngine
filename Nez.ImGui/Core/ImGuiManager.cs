@@ -27,6 +27,11 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	public bool ShowAnimationEventInspector = false;
 	public bool ShowMenuBar = true;
 
+	public string GameWindowTitle => _gameWindowTitle;
+	public bool IsGameWindowFocused = false;
+	public Num.Vector2 GameWindowPosition;
+	public Num.Vector2 GameWindowSize;
+
 	public bool FocusGameWindowOnMiddleClick = false;
 	public bool FocusGameWindowOnRightClick = false;
 	public bool DisableKeyboardInputWhenGameWindowUnfocused = true;
@@ -36,7 +41,6 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	private System.Reflection.MethodInfo[] _themes;
 
 	private CoreWindow _coreWindow = new();
-	public string GameWindowTitle => _gameWindowTitle;
 	public SceneGraphWindow SceneGraphWindow { get; private set; }
 	public MainEntityInspector MainEntityInspector { get; private set; }
 

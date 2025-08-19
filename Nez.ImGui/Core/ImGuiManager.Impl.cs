@@ -558,6 +558,11 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 			string windowTitle = $"Game: {gameWindowState}###{_gameWindowTitle}";
 
 			ImGui.Begin(windowTitle, _gameWindowFlags);
+
+			IsGameWindowFocused = ImGui.IsWindowFocused(ImGuiFocusedFlags.None);
+			GameWindowSize = ImGui.GetWindowSize();
+			GameWindowPosition = ImGui.GetWindowPos();
+
 			ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, Num.Vector2.Zero);
 			ImGui.ImageButton("SeparateGameWindowImageButton", _renderTargetId, ImGui.GetContentRegionAvail());
 			ImGui.PopStyleVar();

@@ -43,35 +43,50 @@ namespace Nez.ImGuiTools
             _imGuiManager = imGuiManager;
         }
 
-        /// <summary>
-        /// Call this from ImGuiManager.LayoutGui or Update to handle selection logic.
-        /// </summary>
-        public void UpdateSelection()
+		/// <summary>
+		/// Call this from ImGuiManager.LayoutGui or Update to handle selection logic.
+		/// </summary>
+		public void UpdateSelection()
         {
             UpdateModifierKeys();
-            DrawAndHandleEntityGizmo();
 
-			if(!IsMouseOverGizmo)
-				HandleBoxSelection(); // Don't make the box selection if the mouse is over the gizmo
-
-			HandleEntityDragging();
-
-            if (ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
-            {
-                // Only clear selection if no modifier is pressed
-                if (!_ctrlDown && !_shiftDown)
-                    DeselectEntity();
-
-                TrySelectEntityAtMouse();
-                _isBoxSelecting = false;
-            }
-            else if (Input.LeftMouseButtonPressed && !_draggingX && !_draggingY && !IsMouseOverGizmo && !_ctrlDown && !_shiftDown)
-            {
-                DeselectEntity();
+            if (_imGuiManager.IsGameWindowFocused && IsCursorWithinGameWindow())
+			{
+				DrawAndHandleEntityGizmo();
+   
+				if (!IsMouseOverGizmo)
+					HandleBoxSelection(); // Don't make the box selection if the mouse is over the gizmo or in Play Mode
+   
+				HandleEntityDragging();
+   
+				if (Input.DoubleLeftMouseButtonPressed)
+				{
+					// Only clear selection if no modifier is pressed
+					if (!_ctrlDown && !_shiftDown)
+						DeselectEntity();
+   
+					TrySelectEntityAtMouse();
+					_isBoxSelecting = false;
+				}
+				else if (Input.LeftMouseButtonPressed && !_draggingX && !_draggingY && !IsMouseOverGizmo && !_ctrlDown && !_shiftDown)
+				{
+					DeselectEntity();
+				}
 			}
         }
+        public bool IsCursorWithinGameWindow()
+        {
+	        var windowPos = _imGuiManager.GameWindowPosition;
+	        var windowSize = _imGuiManager.GameWindowSize;
+	        var mousePos = ImGui.GetIO().MousePos;
 
-        private void UpdateModifierKeys()
+	        bool withinX = mousePos.X >= windowPos.X && mousePos.X < windowPos.X + windowSize.X;
+	        bool withinY = mousePos.Y >= windowPos.Y && mousePos.Y < windowPos.Y + windowSize.Y;
+
+	        return withinX && withinY;
+        }
+
+		private void UpdateModifierKeys()
         {
             _ctrlDown = ImGui.GetIO().KeyCtrl || ImGui.GetIO().KeySuper;
             _shiftDown = ImGui.GetIO().KeyShift;

@@ -25,6 +25,10 @@ namespace Nez
 		static internal FastList<VirtualInput> _virtualInputs = new FastList<VirtualInput>();
 		static int _maxSupportedGamePads;
 
+		private static double _lastLeftClickTime = -1;
+		private static bool _doubleLeftMouseButtonPressed = false;
+		private const double DoubleClickThreshold = 0.3; // seconds
+
 		/// <summary>
 		/// the TouchInput details when on a device that supports touch
 		/// </summary>
@@ -91,12 +95,33 @@ namespace Nez
 			_previousMouseState = _currentMouseState;
 			_currentMouseState = Mouse.GetState();
 
+			// Double-click detection
+			_doubleLeftMouseButtonPressed = false;
+			if (LeftMouseButtonPressed)
+			{
+				double currentTime = Time.TotalTime;
+				if (_lastLeftClickTime > 0 && (currentTime - _lastLeftClickTime) <= DoubleClickThreshold)
+				{
+					_doubleLeftMouseButtonPressed = true;
+					_lastLeftClickTime = -1; // reset to avoid triple-click
+				}
+				else
+				{
+					_lastLeftClickTime = currentTime;
+				}
+			}
+
 			for (var i = 0; i < _maxSupportedGamePads; i++)
 				GamePads[i].Update();
 
 			for (var i = 0; i < _virtualInputs.Length; i++)
 				_virtualInputs.Buffer[i].Update();
 		}
+
+		/// <summary>
+		/// Returns true only the frame a quick double left mouse button click occurs.
+		/// </summary>
+		public static bool DoubleLeftMouseButtonPressed => _doubleLeftMouseButtonPressed;
 
 		/// <summary>
 		/// this takes into account the SceneResolutionPolicy and returns the value scaled to the RenderTargets coordinates
