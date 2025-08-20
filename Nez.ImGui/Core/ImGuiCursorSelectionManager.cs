@@ -459,19 +459,24 @@ namespace Nez.ImGuiTools
                 foreach (var entity in selectedEntities)
                     _dragEndEntityPositions[entity] = entity.Transform.Position;
 
-                // Only push undo if any entity moved
-                bool anyMoved = selectedEntities.Any(e => _dragStartEntityPositions[e] != _dragEndEntityPositions[e]);
-                if (anyMoved)
+				// Only push undo if any entity moved
+				bool anyMoved = selectedEntities.Any(e =>
+					_dragStartEntityPositions.TryGetValue(e, out var startPos) &&
+					_dragEndEntityPositions.TryGetValue(e, out var endPos) &&
+					startPos != endPos
+				); 
+				
+				if (anyMoved)
                 {
                     EditorChangeTracker.PushUndo(
                         new MultiEntityTransformUndoAction(
                             selectedEntities.ToList(),
                             _dragStartEntityPositions,
                             _dragEndEntityPositions,
-                            $"Move {string.Join(", ", selectedEntities.Select(e => e.Name))}"
+                            $"Moved {string.Join(", ", selectedEntities.Select(e => e.Name))}"
                         ),
                         selectedEntities.First(),
-                        $"Move {string.Join(", ", selectedEntities.Select(e => e.Name))}"
+                        $"Moved {string.Join(", ", selectedEntities.Select(e => e.Name))}"
                     );
                 }
             }

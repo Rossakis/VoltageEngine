@@ -29,6 +29,7 @@ namespace Nez
 				Glue = rigidbody.Glue;
 				ShouldUseGravity = rigidbody.ShouldUseGravity;
 				Velocity = rigidbody.Velocity;
+				Enabled = rigidbody.Enabled;
 			}
 		}
 
@@ -224,11 +225,12 @@ namespace Nez
 							// neighbor has no ArcadeRigidbody so we assume its immovable and only move ourself
 							Entity.Transform.Position -= collisionResult.MinimumTranslationVector;
 							var relativeVelocity = Velocity;
-							CalculateResponseVelocity(ref relativeVelocity, ref collisionResult.MinimumTranslationVector,
+							CalculateResponseVelocity(ref relativeVelocity,
+								ref collisionResult.MinimumTranslationVector,
 								out relativeVelocity);
 							Velocity += relativeVelocity;
 						}
-				}
+					}
 			}
 		}
 

@@ -7,7 +7,10 @@ namespace Nez;
 /// <summary>
 /// ComponentData class for Components. This is used to serialize Component data to JSON.
 /// </summary>
-public abstract class ComponentData { }
+public abstract class ComponentData
+{
+	public bool Enabled = true;
+}
 
 // Helper struct to store component type and its data as JSON
 public struct ComponentDataEntry

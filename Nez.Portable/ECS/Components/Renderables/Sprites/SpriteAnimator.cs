@@ -69,7 +69,6 @@ public class SpriteAnimator : SpriteRenderer, IUpdatable
 		public Vector2 Origin = Vector2.Zero;
 		public float LayerDepth = 0f;
 		public int RenderLayer = 0;
-		public bool Enabled = true;
 		public SpriteEffects SpriteEffects = SpriteEffects.None;
 		public List<string> LoadedLayers = new();
 		public string LoadedTag = "";
@@ -389,13 +388,47 @@ public class SpriteAnimator : SpriteRenderer, IUpdatable
 			}
 		}
 
-		if (ShouldChangeFrame()) NextFrame();
+		// Fire normal AnimationEvents when the frame ENDS (before changing frame)
+		if (ShouldChangeFrame())
+		{
+			foreach (var evt in AnimationEvents)
+			{
+				if (evt is LongAnimationEvent)
+					continue; // Skip, handled above
+
+				if (evt.StartFrame == CurrentFrame && !string.IsNullOrEmpty(evt.Name))
+				{
+					var key = (CurrentAnimationName, evt.Name);
+					if (_animationEventSubscribers.TryGetValue(key, out var subscribers))
+					{
+						foreach (var subscriber in subscribers)
+							subscriber?.Invoke();
+					}
+					evt.Callback?.Invoke();
+				}
+			}
+			NextFrame();
+		}
 	}
 
 	private bool LoadLastAnimation()
 	{
 		if (!string.IsNullOrEmpty(TextureFilePath) && !string.IsNullOrEmpty(LoadedTag) && LoadedLayers.Count > 0)
 		{
+			// Try to load the Aseprite file
+			var asepriteFile = Entity?.Scene?.Content?.LoadAsepriteFile(TextureFilePath) ?? Core.Content.LoadAsepriteFile(TextureFilePath);
+			if (asepriteFile == null)
+				return false;
+
+			// Check if the tag exists in the file
+			bool tagExists = asepriteFile.Tags.Any(t => t.Name == LoadedTag);
+			if (!tagExists)
+			{
+				// Optionally log a warning here
+				//System.Console.WriteLine($"SpriteAnimator: Tag '{LoadedTag}' not found in '{TextureFilePath}'. Skipping animation load.");
+				return false;
+			}
+
 			if (LoadedLayers != null && LoadedLayers.Count > 0)
 			{
 				AnimationUtils.LoadAsepriteAnimationWithLayers(this, TextureFilePath, LoadedTag, null, LoadedLayers.ToArray());
@@ -421,6 +454,8 @@ public class SpriteAnimator : SpriteRenderer, IUpdatable
 
 		if(LoadLastAnimation())
 			Play(LoadedTag);
+
+		RestoreSavedOriginIfAvailable();
 	}
 
 	public virtual void NextFrame()
@@ -573,23 +608,8 @@ public class SpriteAnimator : SpriteRenderer, IUpdatable
 		Sprite = CurrentAnimation.Sprites[frameIndex];
 		FrameTimeLeft = ConvertFrameRateToSeconds(CurrentAnimation.FrameRates[frameIndex]);
 
-		// Trigger AnimationEvents for this frame (only normal events)
-		foreach (var evt in AnimationEvents)
-		{
-			if (evt is LongAnimationEvent)
-				continue; // Skip, handled in Update
-
-			if (evt.StartFrame == frameIndex && !string.IsNullOrEmpty(evt.Name))
-			{
-				var key = (CurrentAnimationName, evt.Name);
-				if (_animationEventSubscribers.TryGetValue(key, out var subscribers))
-				{
-					foreach (var subscriber in subscribers)
-						subscriber?.Invoke();
-				}
-				evt.Callback?.Invoke();
-			}
-		}
+		// Restore saved origin after frame change
+		RestoreSavedOriginIfAvailable();
 	}
 
 	/// <summary>
@@ -718,5 +738,24 @@ public class SpriteAnimator : SpriteRenderer, IUpdatable
 	        _animationEventSubscribers[key] = list;
 	    }
 	    list.Add(callback);
+	}
+
+	private void RestoreSavedOriginIfAvailable()
+	{
+	    if (_animatorData != null)
+	    {
+	        // Only re-apply if the saved origin is not the default (0,0)
+	        // You may want to adjust this logic if (0,0) is a valid custom origin in your workflow
+	        if (_animatorData.Origin != Vector2.Zero)
+	            Origin = _animatorData.Origin;
+	    }
+	}
+
+	public override SpriteRenderer SetSprite(Sprite sprite)
+	{
+		base.SetSprite(sprite);
+
+		RestoreSavedOriginIfAvailable();
+		return this;
 	}
 }

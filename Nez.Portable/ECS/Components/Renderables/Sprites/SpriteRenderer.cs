@@ -34,7 +34,6 @@ namespace Nez.Sprites
 			public Vector2 Origin = Vector2.Zero;
 			public float LayerDepth = 0f;
 			public int RenderLayer = 0;
-			public bool Enabled = true;
 			public SpriteEffects SpriteEffects = SpriteEffects.None;
 			public ImageFileType FileType = ImageFileType.None;
 			
@@ -89,7 +88,7 @@ namespace Nez.Sprites
 				}
 			}
 
-			public SpriteRendererComponentData() 
+			public SpriteRendererComponentData()
 			{
 				// Ensure all properties have explicit default values
 				TextureFilePath = "";
@@ -375,7 +374,7 @@ namespace Nez.Sprites
 		/// sets the Sprite and updates the origin of the Sprite to match Sprite.origin. If for whatever reason you need
 		/// an origin different from the Sprite either clone it or set the origin AFTER setting the Sprite here.
 		/// </summary>
-		public SpriteRenderer SetSprite(Sprite sprite)
+		public virtual SpriteRenderer SetSprite(Sprite sprite)
 		{
 			_sprite = sprite;
 			if (_sprite != null)

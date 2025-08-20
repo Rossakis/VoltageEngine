@@ -16,6 +16,7 @@ public static partial class Debug
 
 		public static Color ColliderBounds = Color.White * 0.3f;
 		public static Color ColliderEdge = Color.DarkRed;
+		public static Color ColliderDisabledModeEdge = Color.DarkRed * 0.2f;
 		public static Color ColliderPosition = Color.Yellow;
 		public static Color ColliderCenter = Color.Red;
 

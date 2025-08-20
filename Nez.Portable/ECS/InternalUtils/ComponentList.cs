@@ -271,14 +271,20 @@ public class ComponentList : IEnumerable<Component>
 		if (!Core.IsEditMode)
 		{
 			for (var i = 0; i < _updatableComponents.Length; i++)
-				if (_updatableComponents.Buffer[i].Enabled && (_updatableComponents.Buffer[i] as Component).Enabled)
+			{
+				bool isColliderVisible = _components.Buffer[i] is Collider collider && collider.IsVisibleEvenDisabled;
+				if ((_updatableComponents.Buffer[i].Enabled && 
+				    (_updatableComponents.Buffer[i] as Component).Enabled) || isColliderVisible)
 					_updatableComponents.Buffer[i].Update();
+
+			}
 		}
 		else
 		{
 			// If in Edit Mode, update only components that are renderable (for correct rendering)
 			for (var i = 0; i < _updatableComponents.Length; i++)
-				if (_updatableComponents.Buffer[i].Enabled && (_updatableComponents.Buffer[i] as Component).Enabled &&
+				if (_updatableComponents.Buffer[i].Enabled && 
+				    (_updatableComponents.Buffer[i] as Component).Enabled &&
 				    _updatableComponents.Buffer[i] is RenderableComponent)
 					_updatableComponents.Buffer[i].Update();
 		}
@@ -312,8 +318,12 @@ public class ComponentList : IEnumerable<Component>
 	internal void DebugRender(Batcher batcher)
 	{
 		for (var i = 0; i < _components.Length; i++)
-			if (_components.Buffer[i].Enabled)
+		{
+			// If the component is enabled or if it is a Collider that should be debug rendered even when disabled, render it
+			if (_components.Buffer[i].Enabled || (_components.Buffer[i] is Collider collider && collider.IsVisibleEvenDisabled))
 				_components.Buffer[i].DebugRender(batcher);
+
+		}
 	}
 
 

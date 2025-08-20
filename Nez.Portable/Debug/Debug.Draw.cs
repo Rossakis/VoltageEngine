@@ -1,7 +1,9 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Nez.BitmapFonts;
+using Nez.PhysicsShapes;
 using Nez.Utils.Fonts;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 
@@ -129,6 +131,70 @@ namespace Nez
 				return;
 
 			_debugDrawItems.Add(new DebugDrawItem(font, text, position, color, duration, scale));
+		}
+
+		[Conditional("DEBUG")]
+		public static void DrawPolygon(Vector2 position, Vector2[] points, Color color, bool closePoly = true, float duration = 0f)
+		{
+			if (!Core.DebugRenderEnabled || points == null || points.Length < 2)
+				return;
+
+			for (int i = 1; i < points.Length; i++)
+				DrawLine(position + points[i - 1], position + points[i], color, duration);
+
+			if (closePoly)
+				DrawLine(position + points[points.Length - 1], position + points[0], color, duration);
+		}
+
+		[Conditional("DEBUG")]
+		public static void DrawCircle(Vector2 center, float radius, Color color, float duration = 0f, int resolution = 32)
+		{
+			if (!Core.DebugRenderEnabled)
+				return;
+
+			float increment = MathHelper.TwoPi / resolution;
+			Vector2 prev = center + new Vector2(radius, 0);
+
+			for (int i = 1; i <= resolution; i++)
+			{
+				float angle = i * increment;
+				Vector2 next = center + new Vector2((float)Math.Cos(angle) * radius, (float)Math.Sin(angle) * radius);
+				DrawLine(prev, next, color, duration);
+				prev = next;
+			}
+		}
+
+		public static void DrawColliderDelayed(Collider collider, Color color, float duration)
+		{
+			if (collider == null)
+				return;
+		
+			// BoxCollider
+			if (collider is BoxCollider)
+			{
+				DrawHollowRect(collider.Bounds, color, duration);
+			}
+			// CircleCollider
+			else if (collider is CircleCollider circle)
+			{
+				var center = circle.Shape.Position;
+				var radius = circle.Radius;
+				DrawCircle(center, radius, color, duration);
+			}
+			// PolygonCollider
+			else if (collider is PolygonCollider polygon)
+			{
+				var poly = polygon.Shape as Polygon;
+				if (poly != null)
+				{
+					DrawPolygon(polygon.Shape.Position, poly.Points, color, true, duration);
+				}
+			}
+			// Fallback: draw bounds as rectangle
+			else
+			{
+				DrawHollowRect(collider.Bounds, color, duration);
+			}
 		}
 
 		[Conditional("DEBUG")]

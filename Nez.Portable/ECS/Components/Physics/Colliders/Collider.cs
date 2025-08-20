@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Xna.Framework;
 using Nez.PhysicsShapes;
@@ -16,6 +17,7 @@ namespace Nez
 			public int PhysicsLayer;
 			public int CollidesWithLayers;
 			public bool ShouldColliderScaleAndRotateWithTransform;
+			public bool IsVisibleEvenDisabled; 
 
 			// BoxCollider
 			public RectangleF Rectangle; // Local rectangle (x, y, width, height)
@@ -28,16 +30,16 @@ namespace Nez
 			public Vector2[] PolygonPoints; // Local points
 		}
 
-		private ColliderComponentData _data = new ColliderComponentData();
-
 		public override ComponentData Data
 		{
 			get
 			{
+				_data.Enabled = Enabled;
 				_data.IsTrigger = IsTrigger;
 				_data.PhysicsLayer = PhysicsLayer;
 				_data.CollidesWithLayers = CollidesWithLayers;
 				_data.ShouldColliderScaleAndRotateWithTransform = ShouldColliderScaleAndRotateWithTransform;
+				_data.IsVisibleEvenDisabled = IsVisibleEvenDisabled;
 
 				if (this is BoxCollider box)
 				{
@@ -65,10 +67,12 @@ namespace Nez
 			{
 				if (value is ColliderComponentData colliderData)
 				{
+					Enabled = colliderData.Enabled;
 					IsTrigger = colliderData.IsTrigger;
 					PhysicsLayer = colliderData.PhysicsLayer;
 					CollidesWithLayers = colliderData.CollidesWithLayers;
 					ShouldColliderScaleAndRotateWithTransform = colliderData.ShouldColliderScaleAndRotateWithTransform;
+					IsVisibleEvenDisabled = colliderData.IsVisibleEvenDisabled;
 
 					if (this is BoxCollider box)
 					{
@@ -93,7 +97,9 @@ namespace Nez
 				}
 			}
 		}
-		#endregion
+
+		private ColliderComponentData _data = new ColliderComponentData();
+
 		/// <summary>
 		/// the underlying Shape of the Collider
 		/// </summary>
@@ -150,6 +156,7 @@ namespace Nez
 		/// </summary>
 		public bool ShouldColliderScaleAndRotateWithTransform = true;
 
+		public bool IsVisibleEvenDisabled;
 		public virtual RectangleF Bounds
 		{
 			get
@@ -170,10 +177,10 @@ namespace Nez
 		/// </summary>
 		internal RectangleF registeredPhysicsBounds;
 
-		protected bool _colliderRequiresAutoSizing;
-
+		#endregion
 		protected Vector2 _localOffset;
 		internal float _localOffsetLength;
+		protected bool _colliderRequiresAutoSizing;
 
 		/// <summary>
 		/// flag to keep track of if our Entity was added to a Scene
@@ -290,22 +297,26 @@ namespace Nez
 
 		public override void OnEntityTransformChanged(Transform.Component comp)
 		{
-			// set the appropriate dirty flags
-			switch (comp)
+			// Always update position/rotation/scale if visible, even when disabled
+			if (Enabled || IsVisibleEvenDisabled)
 			{
-				case Transform.Component.Position:
-					_isPositionDirty = true;
-					break;
-				case Transform.Component.Scale:
-					_isPositionDirty = true;
-					break;
-				case Transform.Component.Rotation:
-					_isRotationDirty = true;
-					break;
-			}
+				switch (comp)
+				{
+					case Transform.Component.Position:
+						_isPositionDirty = true;
+						break;
+					case Transform.Component.Scale:
+						_isPositionDirty = true;
+						break;
+					case Transform.Component.Rotation:
+						_isRotationDirty = true;
+						break;
+				}
 
-			if (_isColliderRegistered)
-				Physics.UpdateCollider(this);
+				// Only update physics if enabled
+				if (_isColliderRegistered && Enabled)
+					Physics.UpdateCollider(this);
+			}
 		}
 
 
@@ -357,6 +368,7 @@ namespace Nez
 		/// <param name="collider">Collider.</param>
 		public bool Overlaps(Collider other)
 		{
+			if (!Enabled) return false;
 			return Shape.Overlaps(other.Shape);
 		}
 
@@ -370,12 +382,13 @@ namespace Nez
 		/// <param name="result">Result.</param>
 		public bool CollidesWith(Collider collider, out CollisionResult result)
 		{
+			result = default;
+			if (!Enabled) return false;
 			if (Shape.CollidesWithShape(collider.Shape, out result))
 			{
 				result.Collider = collider;
 				return true;
 			}
-
 			return false;
 		}
 
@@ -390,7 +403,8 @@ namespace Nez
 		/// <param name="result">Result.</param>
 		public bool CollidesWith(Collider collider, Vector2 motion, out CollisionResult result)
 		{
-			// alter the shapes position so that it is in the place it would be after movement so we can check for overlaps
+			result = default;
+			if (!Enabled) return false;
 			var oldPosition = Shape.Position;
 			Shape.Position += motion;
 
@@ -398,9 +412,7 @@ namespace Nez
 			if (didCollide)
 				result.Collider = collider;
 
-			// return the shapes position to where it was before the check
 			Shape.Position = oldPosition;
-
 			return didCollide;
 		}
 
@@ -414,6 +426,7 @@ namespace Nez
 		public bool CollidesWithAny(out CollisionResult result)
 		{
 			result = new CollisionResult();
+			if (!Enabled) return false;
 
 			// fetch anything that we might collide with at our new position
 			var neighbors = Physics.BoxcastBroadphaseExcludingSelf(this, CollidesWithLayers);
@@ -443,6 +456,7 @@ namespace Nez
 		public bool CollidesWithAny(ref Vector2 motion, out CollisionResult result)
 		{
 			result = new CollisionResult();
+			if (!Enabled) return false;
 
 			// fetch anything that we might collide with at our new position
 			var colliderBounds = Bounds;
@@ -450,7 +464,6 @@ namespace Nez
 			colliderBounds.Y += motion.Y;
 			var neighbors = Physics.BoxcastBroadphaseExcludingSelf(this, ref colliderBounds, CollidesWithLayers);
 
-			// alter the shapes position so that it is in the place it would be after movement so we can check for overlaps
 			var oldPosition = Shape.Position;
 			Shape.Position += motion;
 
@@ -471,14 +484,11 @@ namespace Nez
 				}
 			}
 
-			// return the shapes position to where it was before the check
 			Shape.Position = oldPosition;
-
 			return didCollide;
 		}
 
 		#endregion
-
 
 		public override Component Clone()
 		{

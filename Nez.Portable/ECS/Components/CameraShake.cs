@@ -11,7 +11,6 @@ namespace Nez
 		{
 			public float TimePerFrame;
 			public float FinishedThreshold;
-			public bool Enabled;
 			public float ShakeIntensity;
 			public float ShakeDegradation;
 		}
@@ -22,9 +21,9 @@ namespace Nez
 		{
 			get
 			{
+				_data.Enabled = Enabled;
 				_data.TimePerFrame = TimePerFrame;
 				_data.FinishedThreshold = FinishedThreshold;
-				_data.Enabled = Enabled;
 				_data.ShakeIntensity = ShakeIntensity;
 				_data.ShakeDegradation = ShakeDegradation;
 				return _data;
@@ -33,9 +32,9 @@ namespace Nez
 			{
 				if (value is CameraShakeComponentData shakeData)
 				{
+					Enabled = shakeData.Enabled;
 					TimePerFrame = shakeData.TimePerFrame;
 					FinishedThreshold = shakeData.FinishedThreshold;
-					Enabled = shakeData.Enabled;
 					ShakeIntensity = shakeData.ShakeIntensity;
 					ShakeDegradation = shakeData.ShakeDegradation;
 					_data = shakeData;

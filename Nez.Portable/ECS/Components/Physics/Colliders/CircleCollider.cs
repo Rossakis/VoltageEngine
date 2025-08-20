@@ -73,10 +73,16 @@ namespace Nez
 		public override void DebugRender(Batcher batcher)
 		{
 			batcher.DrawHollowRect(Bounds, Debug.Colors.ColliderBounds, Debug.Size.LineSizeMultiplier);
-			batcher.DrawCircle(Shape.Position, ((Circle) Shape).Radius, Debug.Colors.ColliderEdge,
+
+			if(Enabled)
+				batcher.DrawCircle(Shape.Position, ((Circle) Shape).Radius, Debug.Colors.ColliderEdge,
 				Debug.Size.LineSizeMultiplier);
+			else if(!Enabled && IsVisibleEvenDisabled)
+				batcher.DrawCircle(Shape.Position, ((Circle)Shape).Radius, Debug.Colors.ColliderDisabledModeEdge,
+					Debug.Size.LineSizeMultiplier);
+
 			batcher.DrawPixel(Entity.Transform.Position, Debug.Colors.ColliderPosition,
-				4 * Debug.Size.LineSizeMultiplier);
+					4 * Debug.Size.LineSizeMultiplier);
 			batcher.DrawPixel(Shape.Position, Debug.Colors.ColliderCenter, 2 * Debug.Size.LineSizeMultiplier);
 		}
 

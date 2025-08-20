@@ -167,10 +167,16 @@ namespace Nez
 		{
 			var poly = Shape as Polygon;
 			batcher.DrawHollowRect(Bounds, Debug.Colors.ColliderBounds, Debug.Size.LineSizeMultiplier);
-			batcher.DrawPolygon(Shape.Position, poly.Points, Debug.Colors.ColliderEdge, true,
+
+
+			if(Enabled)
+				batcher.DrawPolygon(Shape.Position, poly.Points, Debug.Colors.ColliderEdge, true,
 				Debug.Size.LineSizeMultiplier);
-			
-			if(Entity == null)
+			else if(!Enabled && IsVisibleEvenDisabled)
+				batcher.DrawPolygon(Shape.Position, poly.Points, Debug.Colors.ColliderDisabledModeEdge, true,
+					Debug.Size.LineSizeMultiplier);
+
+			if (Entity == null)
 				return;
 			
 			batcher.DrawPixel(Entity.Transform.Position, Debug.Colors.ColliderPosition,
@@ -201,7 +207,7 @@ namespace Nez
 			}
 			
 			var clone = new BoxCollider();
-			
+
 			// Copy all base Collider properties
 			clone.IsTrigger = IsTrigger;
 			clone.PhysicsLayer = PhysicsLayer;
@@ -226,10 +232,11 @@ namespace Nez
 			clone._isRotationDirty = true;
 			
 			// Copy the component data
-			if (Data != null && Data is Collider.ColliderComponentData colliderData)
+			if (Data != null && Data is ColliderComponentData colliderData)
 			{
-				clone.Data = new Collider.ColliderComponentData
+				clone.Data = new ColliderComponentData
 				{
+					Enabled = colliderData.Enabled,
 					IsTrigger = colliderData.IsTrigger,
 					PhysicsLayer = colliderData.PhysicsLayer,
 					CollidesWithLayers = colliderData.CollidesWithLayers,
