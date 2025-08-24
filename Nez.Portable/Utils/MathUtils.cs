@@ -1,4 +1,5 @@
-﻿using Microsoft.Xna.Framework;
+﻿using System;
+using Microsoft.Xna.Framework;
 
 namespace Nez.Utils
 {
@@ -13,5 +14,22 @@ namespace Nez.Utils
         {
             return float.IsNaN(vector.X) || float.IsNaN(vector.Y);
         }
-    }
+
+        public static bool IsNumBetween(float max, float min, float value)
+        {
+	        return value <= max && value >= min;
+        }
+
+		/// <summary>
+		/// Returns true if the absolute value of 'value' is between the absolute values of 'min' and 'max'
+		/// </summary>
+		/// <param name="max"></param>
+		/// <param name="min"></param>
+		/// <param name="value"></param>
+		/// <returns></returns>
+		public static bool IsNumBetweenAbs(float max, float min, float value)
+        {
+	        return Math.Abs(value) <= Math.Abs(max) && Math.Abs(value) >= Math.Abs(min);
+        }
+	}
 }

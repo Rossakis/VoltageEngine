@@ -538,17 +538,18 @@ public class MainEntityInspector
 		if (Entity == null || _imguiManager?.SceneGraphWindow?.EntityPane == null)
 			return;
 
-		// Use the existing DuplicateEntity method from EntityPane
 		var newPrefab = _imguiManager.SceneGraphWindow.EntityPane.DuplicateEntity(Entity, prefabName);
-		
+
 		if (newPrefab != null)
 		{
-			// Save the prefab using the async event system
-			bool saveSuccessful = await _imguiManager.InvokePrefabCreated(newPrefab, false);
-			
+			newPrefab.Type = Entity.InstanceType.Prefab;
+			newPrefab.Name = prefabName;
+			newPrefab.OriginalPrefabName = prefabName;
+
+			bool saveSuccessful = await _imguiManager.InvokePrefabCreated(newPrefab, canOverride);
+
 			if (saveSuccessful)
 			{
-				// Add the new prefab to the cache so it appears in the entity selector
 				_imguiManager.SceneGraphWindow.AddPrefabToCache(newPrefab.Name);
 				NotificationSystem.ShowTimedNotification($"Successfully created and saved prefab: {newPrefab.Name}");
 			}

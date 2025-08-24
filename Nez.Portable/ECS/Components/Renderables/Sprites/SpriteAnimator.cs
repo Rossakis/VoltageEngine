@@ -454,8 +454,6 @@ public class SpriteAnimator : SpriteRenderer, IUpdatable
 
 		if(LoadLastAnimation())
 			Play(LoadedTag);
-
-		RestoreSavedOriginIfAvailable();
 	}
 
 	public virtual void NextFrame()
@@ -607,9 +605,6 @@ public class SpriteAnimator : SpriteRenderer, IUpdatable
 		CurrentFrame = frameIndex;
 		Sprite = CurrentAnimation.Sprites[frameIndex];
 		FrameTimeLeft = ConvertFrameRateToSeconds(CurrentAnimation.FrameRates[frameIndex]);
-
-		// Restore saved origin after frame change
-		RestoreSavedOriginIfAvailable();
 	}
 
 	/// <summary>
@@ -740,22 +735,9 @@ public class SpriteAnimator : SpriteRenderer, IUpdatable
 	    list.Add(callback);
 	}
 
-	private void RestoreSavedOriginIfAvailable()
-	{
-	    if (_animatorData != null)
-	    {
-	        // Only re-apply if the saved origin is not the default (0,0)
-	        // You may want to adjust this logic if (0,0) is a valid custom origin in your workflow
-	        if (_animatorData.Origin != Vector2.Zero)
-	            Origin = _animatorData.Origin;
-	    }
-	}
-
 	public override SpriteRenderer SetSprite(Sprite sprite)
 	{
 		base.SetSprite(sprite);
-
-		RestoreSavedOriginIfAvailable();
 		return this;
 	}
 }
