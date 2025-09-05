@@ -1,5 +1,8 @@
-﻿using Microsoft.Xna.Framework;
+﻿using Microsoft.VisualBasic.FileIO;
+using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 using Nez.Utils;
+using static Nez.Sprites.SpriteRenderer.SpriteRendererComponentData;
 
 
 namespace Nez.DeferredLighting
@@ -10,6 +13,65 @@ namespace Nez.DeferredLighting
 	/// </summary>
 	public class DirLight : DeferredLight
 	{
+		public class DirLightComponentData : ComponentData
+		{
+			public Vector3 Direction;
+			public float SpecularIntensity;
+			public float SpecularPower;
+			public bool Enabled;
+
+			public byte ColorR = 255;
+			public byte ColorG = 255;
+			public byte ColorB = 255;
+			public byte ColorA = 255;
+
+			public DirLightComponentData() { }
+
+			public DirLightComponentData(Color color)
+			{
+				ColorR = color.R;
+				ColorG = color.G;
+				ColorB = color.B;
+				ColorA = color.A;
+			}
+
+			public Color Color
+			{
+				get => new Color(ColorR, ColorG, ColorB, ColorA);
+				set
+				{
+					ColorR = value.R;
+					ColorG = value.G;
+					ColorB = value.B;
+					ColorA = value.A;
+				}
+			}
+		}
+
+		public override ComponentData Data
+		{
+			get => new DirLightComponentData
+			{
+				Enabled = Enabled,
+				Color = Color,
+				Direction = Direction,
+				SpecularIntensity = SpecularIntensity,
+				SpecularPower = SpecularPower
+			};
+			set
+			{
+				if (value is DirLightComponentData data)
+				{
+					Enabled = data.Enabled;
+					Color = data.Color;
+					Direction = data.Direction;
+					SpecularIntensity = data.SpecularIntensity;
+					SpecularPower = data.SpecularPower;
+				}
+			}
+		}
+
+
 		// dir lights are infinite so bounds should be as well
 		public override RectangleF Bounds => _bounds;
 

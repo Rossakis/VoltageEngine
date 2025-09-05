@@ -7,7 +7,6 @@ using Nez.Tiled;
 using Nez.Utils;
 using System;
 using System.IO;
-using System.IO;
 
 
 namespace Nez.Sprites
@@ -41,7 +40,6 @@ namespace Nez.Sprites
 			public AsepriteImageData? AsepriteData = null;
 			public TiledImageData? TiledData = null;
 
-			// Helper property to get/set Color easily (not serialized)
 			public Color Color
 			{
 				get => new Color(ColorR, ColorG, ColorB, ColorA);
