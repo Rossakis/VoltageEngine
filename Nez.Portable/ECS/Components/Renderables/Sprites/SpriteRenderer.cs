@@ -633,7 +633,7 @@ namespace Nez.Sprites
 						{
 							var aseData = _data.AsepriteData.Value;
 							// Use the first frame/layer as normal map by default
-							normalMapTexture = aseFile.GetTextureFromFrameNumber(aseData.FrameNumber);
+							normalMapTexture = aseFile.GetTextureFromFrameNumber(aseData.FrameNumber + 1); //TODO: fix frame number handling
 						}
 						break;
 					case SpriteRendererComponentData.ImageFileType.Tiled:
@@ -959,7 +959,7 @@ namespace Nez.Sprites
 						if (aseFile != null)
 						{
 							// Use first frame by default, or extend as needed
-							normalMapTexture = aseFile.GetTextureFromFrameNumber(0, false);
+							normalMapTexture = aseFile.GetTextureFromFrameNumber(1); //frame zero
 						}
 						break;
 					case SpriteRendererComponentData.ImageFileType.Tiled:
