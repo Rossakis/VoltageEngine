@@ -26,7 +26,7 @@ public class SceneGraphWindow
 	private EntityPane _entityPane = new();
 	private ImGuiManager _imGuiManager;
 	public float SceneGraphWidth => _sceneGraphWidth;
-	public float SceneGraphPosY { get; private set; }
+	public float SceneGraphPosY { get; set; }
 	public bool IsOpen { get; private set; }
 
 	private string _entityFilterName;
@@ -106,13 +106,13 @@ public class SceneGraphWindow
 		if (_imGuiManager == null)
 			_imGuiManager = Core.GetGlobalManager<ImGuiManager>();
 
-		var topMargin = 20f * ImGui.GetIO().FontGlobalScale;
+		// var topMargin = 20f * ImGui.GetIO().FontGlobalScale;
 		var rightMargin = 10f;
 		var leftMargin = 0f;
-		var windowHeight = Screen.Height - topMargin;
+		var windowHeight = Screen.Height - SceneGraphPosY;
+		SceneGraphPosY = _imGuiManager.MainWindowPositionY;
 
 		// Calculate left edge so right edge is always at Screen.Width - rightMargin
-		SceneGraphPosY = topMargin;
 
 		ImGui.PushStyleVar(ImGuiStyleVar.GrabMinSize, 0.0f); // makes grip almost invisible
 		ImGui.PushStyleColor(ImGuiCol.ResizeGrip, new Num.Vector4(0, 0, 0, 0)); // transparent grip

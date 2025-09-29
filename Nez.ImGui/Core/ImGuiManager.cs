@@ -2,16 +2,18 @@ using ImGuiNET;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using Nez.Data;
 using Nez.Editor;
+using Nez.ImGuiTools.Inspectors.CustomInspectors;
 using Nez.ImGuiTools.UndoActions;
 using Nez.Sprites;
+using Nez.UI;
 using Nez.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Nez.Data;
-using Nez.ImGuiTools.Inspectors.CustomInspectors;
+using Nez.ImGuiTools.Utils;
 using Num = System.Numerics;
 
 
@@ -31,7 +33,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	public bool IsGameWindowFocused = false;
 	public Num.Vector2 GameWindowPosition;
 	public Num.Vector2 GameWindowSize;
-
+	public float MainWindowPositionY => _mainMenuBarHeight + _editorToolsBarHeight * FontSizeMultiplier + 1f;
 	public bool FocusGameWindowOnMiddleClick = false;
 	public bool FocusGameWindowOnRightClick = false;
 	public bool DisableKeyboardInputWhenGameWindowUnfocused = true;
@@ -59,9 +61,10 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	private List<EntityInspector> _entityInspectors = new();
 	private List<Action> _drawCommands = new();
 	private ImGuiRenderer _renderer;
+	private ImGuiInput _input = new ImGuiInput();
 	private ImGuiCursorSelectionManager _cursorSelectionManager;
 	public ImGuiCursorSelectionManager CursorSelectionManager => _cursorSelectionManager;
-
+	private ImguiImageLoader _imageLoader;
 	private Num.Vector2 _gameWindowFirstPosition;
 	private string _gameWindowTitle;
 	private ImGuiWindowFlags _gameWindowFlags = 0;
@@ -74,34 +77,43 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	public float GameWindowWidth { get; private set; }
 	public float GameWindowHeight { get; private set; }
 
-	private enum InspectorTab { EntityInspector, Core }
+	private enum InspectorTab
+	{
+		EntityInspector,
+		Core
+	}
+
 	private InspectorTab _selectedInspectorTab = InspectorTab.EntityInspector;
 
 	// Camera Params
 	public static float EditModeCameraSpeed = 250f;
 	public static float EditModeCameraFastSpeed = 500f;
 	private const float EditorCameraZoomSpeed = 1f;
-    
-    // Add these new fields for dynamic speed control
-    public static float EditModeCameraMinSpeed = 50f;
-    public static float EditModeCameraMaxSpeed = 3000f;
-    private static float _dynamicCameraSpeed = EditModeCameraSpeed; // Current dynamic speed
-    private const float CameraSpeedAdjustmentStep = 20f; // How much to change per scroll
-    
-    public static float CurrentCameraSpeed { get; private set; }
 
-    public Vector2 CameraTargetPosition
-    {
+	// Add these new fields for dynamic speed control
+	public static float EditModeCameraMinSpeed = 50f;
+	public static float EditModeCameraMaxSpeed = 3000f;
+	private static float _dynamicCameraSpeed = EditModeCameraSpeed; // Current dynamic speed
+	private const float CameraSpeedAdjustmentStep = 20f; // How much to change per scroll
+
+	public static float CurrentCameraSpeed { get; private set; }
+	public float FontSizeMultiplier => ImGui.GetIO().FontGlobalScale;
+
+	private float _editorToolsBarHeight = 30f;
+
+	public Vector2 CameraTargetPosition
+	{
 		get => _cameraTargetPosition;
 		set => _cameraTargetPosition = value;
 	}
-    private Vector2 _cameraTargetPosition;
-    private float _cameraLerp = 0.4f;
 
-    // Camera dragging with middle mouse button
-    private bool _isCameraDragging = false;
-    private Vector2 _cameraDragStartMouse;
-    private Vector2 _cameraDragStartPosition;
+	private Vector2 _cameraTargetPosition;
+	private float _cameraLerp = 0.4f;
+
+	// Camera dragging with middle mouse button
+	private bool _isCameraDragging = false;
+	private Vector2 _cameraDragStartMouse;
+	private Vector2 _cameraDragStartPosition;
 
 	private bool _pendingExit = false;
 	private bool _pendingSceneChange = false;
@@ -117,6 +129,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	/// Can be used to wait for the scene changes to happen first.
 	/// </summary>
 	public event Func<Task> OnSaveSceneAsync;
+
 	public event Func<Entity, bool, Task<bool>> OnPrefabCreated;
 	public event Func<string, PrefabData> OnPrefabLoadRequested;
 	public event Action<Entity, object> OnLoadEntityData; // Add this for loading entity data
@@ -132,6 +145,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		{
 			return await OnPrefabCreated.Invoke(prefabEntity, overrideExistingPrefab);
 		}
+
 		return false;
 	}
 
@@ -141,6 +155,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		{
 			return OnPrefabLoadRequested.Invoke(prefabName);
 		}
+
 		return new PrefabData();
 	}
 
@@ -148,6 +163,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	{
 		OnLoadEntityData?.Invoke(entity, entityData);
 	}
+
 	#endregion
 
 	public ImGuiManager(ImGuiOptions options = null)
@@ -161,9 +177,10 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		_gameViewForcedPos = WindowPosition.Top;
 
 		LoadSettings();
-		_renderer = new ImGuiRenderer(Core.Instance);
 
+		_renderer = new ImGuiRenderer(Core.Instance, _input);
 		_renderer.RebuildFontAtlas(options);
+
 		Core.Emitter.AddObserver(CoreEvents.SceneChanged, OnSceneChanged);
 		NezImGuiThemes.DarkTheme1();
 
@@ -180,6 +197,9 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		SceneGraphWindow = new SceneGraphWindow();
 		_cursorSelectionManager = new ImGuiCursorSelectionManager(this);
 
+		_imageLoader = new ImguiImageLoader();
+		_imageLoader.LoadSelectionModeIcons(_renderer);
+
 		// Create default Main Entity Inspector window when current scene is finished loading the entities
 		Scene.OnFinishedAddingEntitiesWithData += OpenMainEntityInspector;
 		Core.EmitterWithPending.AddObserver(CoreEvents.Exiting, OnAppExitSaveChanges);
@@ -195,27 +215,34 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	{
 		ImGui.GetIO().ConfigWindowsResizeFromEdges = true;
 
+		float mainWindowHeight = Screen.Height - MainWindowPositionY;
+
 		if (ShowMenuBar)
 			DrawMainMenuBar();
+
+
+		DrawEditorToolsBar();
 
 		if (ShowSeperateGameWindow)
 			DrawGameWindow();
 
-		// --- Inspector/Core Tab Bar and MainEntityInspector ---
+		SceneGraphWindow.Show(ref ShowSceneGraphWindow);
+
 		if (MainEntityInspector != null && MainEntityInspector.IsOpen)
 		{
-			// Calculate position and size for the tab bar and inspector
 			var inspectorWidth = MainEntityInspector.MainInspectorWidth;
 			var inspectorPosX = Screen.Width - inspectorWidth;
-			var inspectorPosY = MainEntityInspector.MainInspectorPosY - MainEntityInspector.MainInspectorOffsetY;
-			var inspectorHeight = Screen.Height - MainEntityInspector.MainInspectorPosY + MainEntityInspector.MainInspectorOffsetY;
+			var inspectorPosY = MainWindowPositionY;
+			var inspectorHeight = mainWindowHeight;
 			var inspectorSize = new Num.Vector2(inspectorWidth, inspectorHeight);
 			var inspectorPos = new Num.Vector2(inspectorPosX, inspectorPosY);
 
 			// Draw the tab bar window (only the tabs, no content)
 			ImGui.SetNextWindowPos(inspectorPos, ImGuiCond.Always);
 			ImGui.SetNextWindowSize(inspectorSize, ImGuiCond.Always);
-			ImGui.Begin("InspectorTabBar", ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoSavedSettings);
+			ImGui.Begin("InspectorTabBar",
+				ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoMove |
+				ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoSavedSettings);
 
 			if (ImGui.BeginTabBar("InspectorTabs", ImGuiTabBarFlags.NoCloseWithMiddleMouseButton))
 			{
@@ -224,19 +251,23 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 					_selectedInspectorTab = InspectorTab.EntityInspector;
 					ImGui.EndTabItem();
 				}
+
 				if (ShowCoreWindow && ImGui.BeginTabItem("Core"))
 				{
 					_selectedInspectorTab = InspectorTab.Core;
 					ImGui.EndTabItem();
 				}
+
 				ImGui.EndTabBar();
 			}
+
 			ImGui.End();
 
 			// Draw the selected inspector window at the same position/size, with no move/resize
 			ImGui.SetNextWindowPos(inspectorPos, ImGuiCond.Always);
 			ImGui.SetNextWindowSize(inspectorSize, ImGuiCond.Always);
-			var inspectorFlags = ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoSavedSettings;
+			var inspectorFlags = ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoMove |
+			                     ImGuiWindowFlags.NoSavedSettings;
 
 			if (_selectedInspectorTab == InspectorTab.EntityInspector)
 			{
@@ -252,6 +283,15 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 			// If MainEntityInspector is not active, show CoreWindow as a standalone window
 			if (ShowCoreWindow)
 			{
+				var inspectorWidth = 420f; // fallback width
+				var inspectorPosX = Screen.Width - inspectorWidth;
+				var inspectorPosY = MainWindowPositionY;
+				var inspectorHeight = mainWindowHeight;
+				var inspectorSize = new Num.Vector2(inspectorWidth, inspectorHeight);
+				var inspectorPos = new Num.Vector2(inspectorPosX, inspectorPosY);
+
+				ImGui.SetNextWindowPos(inspectorPos, ImGuiCond.Always);
+				ImGui.SetNextWindowSize(inspectorSize, ImGuiCond.Always);
 				_coreWindow.Show(ref ShowCoreWindow);
 			}
 		}
@@ -260,8 +300,6 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 
 		for (var i = _drawCommands.Count - 1; i >= 0; i--)
 			_drawCommands[i]();
-
-		SceneGraphWindow.Show(ref ShowSceneGraphWindow);
 
 		if (_spriteAtlasEditorWindow != null)
 			if (!_spriteAtlasEditorWindow.Show())
@@ -281,10 +319,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		NotificationSystem.Draw();
 		GlobalKeyCommands();
 
-		// Delegate entity selection logic to the manager
 		_cursorSelectionManager.UpdateSelection();
-
-		// Highlight all selected entities
 		DrawSelectedEntityOutlines();
 
 		if (ShowAnimationEventInspector)
@@ -312,17 +347,17 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 
 		if (ImGui.IsKeyPressed(ImGuiKey.F1, false) || ImGui.IsKeyPressed(ImGuiKey.F2, false))
 			Core.InvokeSwitchEditMode(!Core.IsEditMode);
-		
+
 		if (ImGui.GetIO().KeyCtrl && ImGui.IsKeyPressed(ImGuiKey.S, false))
 			InvokeSaveSceneChanges();
 
 		// This triggers the same exit/save prompt as the window close event
 #if OS_WINDOWS || LINUX
 		if (ImGui.GetIO().KeyAlt && ImGui.IsKeyPressed(ImGuiKey.F4, false) && !_pendingExit)
-			OnAppExitSaveChanges(true); 
+			OnAppExitSaveChanges(true);
 #elif OS_MAC
 		if (ImGui.GetIO().KeySuper && ImGui.IsKeyPressed(ImGuiKey.Q, false) && !_pendingExit)
-			OnAppExitSaveChanges(true); 
+			OnAppExitSaveChanges(true);
 #endif
 	}
 
@@ -353,7 +388,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 					_spriteAtlasEditorWindow = _spriteAtlasEditorWindow ?? new SpriteAtlasEditorWindow();
 
 				if (ImGui.MenuItem("Quit ImGui"))
-				 SetEnabled(false);
+					SetEnabled(false);
 				ImGui.EndMenu();
 			}
 
@@ -474,7 +509,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 				_cameraTargetPosition = Core.Scene.Camera.Position;
 
 			bool isMovingCamera = Input.IsKeyDown(Keys.W) || Input.IsKeyDown(Keys.A) ||
-								 Input.IsKeyDown(Keys.S) || Input.IsKeyDown(Keys.D);
+			                      Input.IsKeyDown(Keys.S) || Input.IsKeyDown(Keys.D);
 
 			if (Input.IsKeyDown(Keys.LeftShift))
 			{
@@ -520,9 +555,9 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 			{
 				// Modify camera movement speed instead of zoom
 				float speedDelta = Input.MouseWheelDelta * CameraSpeedAdjustmentStep * Time.DeltaTime;
-				_dynamicCameraSpeed = MathHelper.Clamp(_dynamicCameraSpeed + speedDelta, 
-													   EditModeCameraMinSpeed, 
-													   EditModeCameraMaxSpeed);
+				_dynamicCameraSpeed = MathHelper.Clamp(_dynamicCameraSpeed + speedDelta,
+					EditModeCameraMinSpeed,
+					EditModeCameraMaxSpeed);
 			}
 			else
 			{
@@ -567,7 +602,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	{
 		return _dynamicCameraSpeed;
 	}
-	
+
 	#region Public API
 
 	/// <summary>
@@ -604,7 +639,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	/// </summary>
 	/// <param name="texture"></param>
 	/// <returns></returns>
-public IntPtr BindTexture(Texture2D texture)
+	public IntPtr BindTexture(Texture2D texture)
 	{
 		return _renderer.BindTexture(texture);
 	}
@@ -634,9 +669,9 @@ public IntPtr BindTexture(Texture2D texture)
 	{
 		if (MainEntityInspector != null)
 		{
-			if(MainEntityInspector.Entity == entity)
+			if (MainEntityInspector.Entity == entity)
 				return;
-			
+
 			MainEntityInspector.SetEntity(entity);
 		}
 		else
@@ -658,7 +693,8 @@ public IntPtr BindTexture(Texture2D texture)
 			{
 				_entityInspectors.RemoveAt(i);
 
-				if (entitynspectorInitialSpawnOffset - entitynspectorSpawnOffsetIncremental >= 0) // Reset the previous spawn offset 
+				if (entitynspectorInitialSpawnOffset - entitynspectorSpawnOffsetIncremental >=
+				    0) // Reset the previous spawn offset 
 					entitynspectorInitialSpawnOffset -= entitynspectorSpawnOffsetIncremental;
 
 				return;
@@ -690,20 +726,24 @@ public IntPtr BindTexture(Texture2D texture)
 	/// </summary>
 	public void RefreshMainEntityInspector()
 	{
-	    MainEntityInspector?.RefreshComponentInspectors();
+		MainEntityInspector?.RefreshComponentInspectors();
 	}
+
 	#endregion
 
 	#region Entity Selection
+
 	// Remove the entire #region Entity Selection
 	// (TrySelectEntityAtMouse, SetCameraTargetPosition, DeselectEntity)
+
 	#endregion
 
 	#region Save Changes for AppExit/ SceneChange / SceneReset
+
 	private void OnAppExitSaveChanges(bool pending)
 	{
-	    if (pending)
-	    {
+		if (pending)
+		{
 			// Only show the prompt if there are unsaved changes
 			if (EditorChangeTracker.IsDirty)
 				_pendingExit = true;
@@ -733,8 +773,8 @@ public IntPtr BindTexture(Texture2D texture)
 
 	private void ChangeScene(Type sceneType)
 	{
-	    var scene = (Scene)Activator.CreateInstance(sceneType);
-	    Core.StartSceneTransition(new FadeTransition(() => scene));
+		var scene = (Scene)Activator.CreateInstance(sceneType);
+		Core.StartSceneTransition(new FadeTransition(() => scene));
 	}
 
 	private void OnEditModeSwitched(bool isEditMode)
@@ -772,6 +812,7 @@ public IntPtr BindTexture(Texture2D texture)
 		if (OnSaveSceneAsync != null)
 			await OnSaveSceneAsync();
 	}
+
 	#endregion
 
 	public void OpenAnimationEventInspector(SpriteAnimator animator)
@@ -806,6 +847,7 @@ public IntPtr BindTexture(Texture2D texture)
 				var collider = entity.GetComponent<Collider>();
 				_highlightedEntities.Add((entity, collider));
 			}
+
 			_lastSelectedEntities = selectedEntities.ToList();
 		}
 
@@ -822,13 +864,92 @@ public IntPtr BindTexture(Texture2D texture)
 				var pos = entity.Transform.Position;
 				bounds = new RectangleF(pos.X - 8, pos.Y - 8, 16, 16);
 			}
+
 			Debug.DrawHollowRect(bounds, Color.Yellow);
 		}
 	}
 
 	public void ClearHighlightCache()
 	{
-	    _highlightedEntities.Clear();
-	    _lastSelectedEntities = null;
+		_highlightedEntities.Clear();
+		_lastSelectedEntities = null;
+	}
+
+	private void DrawEditorToolsBar()
+	{
+		ImGui.SetNextWindowPos(new Num.Vector2(0, _mainMenuBarHeight), ImGuiCond.Always);
+		ImGui.SetNextWindowSize(new Num.Vector2(Screen.Width, _editorToolsBarHeight * FontSizeMultiplier), ImGuiCond.Always);
+
+		ImGui.Begin("EditorToolsBar",
+			ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoMove |
+			ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoSavedSettings);
+
+		float buttonWidth = 80f * FontSizeMultiplier;
+		float spacing = 12f * FontSizeMultiplier;
+		float totalWidth = buttonWidth * 3 + spacing * 2;
+		float windowWidth = ImGui.GetWindowWidth();
+		float iconSize = 24f * FontSizeMultiplier;
+
+		float windowHeight = ImGui.GetWindowHeight();
+		float iconRowY = (windowHeight - iconSize) * 0.5f;
+		ImGui.SetCursorPos(new Num.Vector2((windowWidth - totalWidth) * 0.5f, iconRowY));
+
+		// Normal Button
+		System.Numerics.Vector4 normalButtonColor;
+		if (_cursorSelectionManager.SelectionMode == CursorSelectionMode.Normal)
+			normalButtonColor = new System.Numerics.Vector4(0.2f, 0.5f, 1f, 1f);
+		else
+			normalButtonColor = ImGui.GetStyle().Colors[(int)ImGuiCol.Button];
+
+		ImGui.PushStyleColor(ImGuiCol.Button, normalButtonColor);
+		bool normalHovered = ImGui.ImageButton("Normal", _imageLoader.NormalIconID, new Num.Vector2(iconSize, iconSize));
+		if (normalHovered)
+			_cursorSelectionManager.SelectionMode = CursorSelectionMode.Normal;
+		ImGui.PopStyleColor();
+
+		if (ImGui.IsItemHovered())
+		{
+			ImGui.SetTooltip("Normal (1)");
+		}
+		ImGui.SameLine(0, spacing);
+
+		// Resize Button 
+		System.Numerics.Vector4 resizeButtonColor;
+		if (_cursorSelectionManager.SelectionMode == CursorSelectionMode.Resize)
+			resizeButtonColor = new System.Numerics.Vector4(0.2f, 0.5f, 1f, 1f);
+		else
+			resizeButtonColor = ImGui.GetStyle().Colors[(int)ImGuiCol.Button];
+
+		ImGui.PushStyleColor(ImGuiCol.Button, resizeButtonColor);
+	 bool resizeHovered = ImGui.ImageButton("Resize", _imageLoader.ResizeIconID, new Num.Vector2(iconSize, iconSize));
+		if (resizeHovered)
+			_cursorSelectionManager.SelectionMode = CursorSelectionMode.Resize;
+		ImGui.PopStyleColor();
+
+		if (ImGui.IsItemHovered())
+		{
+			ImGui.SetTooltip("Resize (2)");
+		}
+		ImGui.SameLine(0, spacing);
+
+		// Rotate Button
+		System.Numerics.Vector4 rotateButtonColor;
+		if (_cursorSelectionManager.SelectionMode == CursorSelectionMode.Rotate)
+			rotateButtonColor = new System.Numerics.Vector4(0.2f, 0.5f, 1f, 1f);
+		else
+			rotateButtonColor = ImGui.GetStyle().Colors[(int)ImGuiCol.Button];
+
+		ImGui.PushStyleColor(ImGuiCol.Button, rotateButtonColor);
+		bool rotateHovered = ImGui.ImageButton("Rotate", _imageLoader.RotateIconID, new Num.Vector2(iconSize, iconSize));
+		if (rotateHovered)
+			_cursorSelectionManager.SelectionMode = CursorSelectionMode.Rotate;
+		ImGui.PopStyleColor();
+
+		if (ImGui.IsItemHovered())
+		{
+			ImGui.SetTooltip("Rotate (3)");
+		}
+
+		ImGui.End();
 	}
 }

@@ -7,6 +7,7 @@ using Nez.ImGuiTools.TypeInspectors;
 using Nez.ImGuiTools.UndoActions;
 using Nez.Sprites;
 using Nez.Textures;
+using Nez.Utils;
 using Num = System.Numerics;
 
 namespace Nez.ImGuiTools.Inspectors.CustomInspectors
@@ -354,7 +355,7 @@ namespace Nez.ImGuiTools.Inspectors.CustomInspectors
                     // Load the new Aseprite animation using AnimationUtils
                     if (selectedLayers.Count > 0)
                     {
-                        Utils.AnimationUtils.LoadAsepriteAnimationWithLayers(
+                        AnimationUtils.LoadAsepriteAnimationWithLayers(
                             animator.Entity,
                             relativePath,
                             animationTagName,
@@ -364,7 +365,7 @@ namespace Nez.ImGuiTools.Inspectors.CustomInspectors
                     }
                     else
                     {
-                        Utils.AnimationUtils.LoadAsepriteAnimationWithLayers(
+                        AnimationUtils.LoadAsepriteAnimationWithLayers(
                             animator.Entity,
                             relativePath,
                             animationTagName,

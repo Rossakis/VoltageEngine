@@ -23,8 +23,8 @@ public class EntityPane
 
     private const int MIN_ENTITIES_FOR_CLIPPER = 100;
     private Entity _previousEntity;
-
 	public IReadOnlyList<Entity> SelectedEntities => _selectedEntities;
+
 	public void SetSelectedEntity(Entity entity, bool ctrlDown, bool shiftDown = false)
 	{
 		if (entity == null && !ctrlDown && !shiftDown)
@@ -685,10 +685,7 @@ public class EntityPane
             var typeName = entity.GetType().Name;
             if (EntityFactoryRegistry.TryCreate(typeName, out var clone))
             {
-                // Use the pending list for unique naming
                 clone.Name = Core.Scene.GetUniqueEntityName(entity.Name, clone, clones);
-
-                // Set up the clone with basic properties
                 clone.Transform.Position = entity.Transform.Position;
                 clone.Transform.Rotation = entity.Rotation;
                 clone.Transform.Scale = entity.Scale;
@@ -789,7 +786,7 @@ public class EntityPane
                     }
                 }
 
-                // Call entity creation logic
+                // Call entity.InitParams() basically 
                 EntityFactoryRegistry.InvokeEntityCreated(clone);
 
                 // Post-creation component data copy (for components that may be reset)
@@ -851,8 +848,6 @@ public class EntityPane
         _selectedEntities.Clear();
         _lastRangeSelectEntity = null; // Reset anchor
         _imGuiManager.ClearHighlightCache();
-
-        // _imGuiManager.SceneGraphWindow.EntityPane.DeselectAllEntities();
 	}
 
 	public Vector2 GetSelectedEntitiesCenter()

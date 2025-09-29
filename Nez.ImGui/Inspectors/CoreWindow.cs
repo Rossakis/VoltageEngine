@@ -27,7 +27,8 @@ namespace Nez.ImGuiTools
 				_imguiManager = Core.GetGlobalManager<ImGuiManager>();
 
 			float inspectorWidth = _imguiManager.MainEntityInspector?.MainInspectorWidth ?? 500f;
-			float inspectorPosY = MainEntityInspector.MainInspectorPosY;
+			float inspectorPosY = _imguiManager.MainWindowPositionY + 20f * _imguiManager.FontSizeMultiplier;
+
 			float windowPosX = Screen.Width - inspectorWidth;
 			float windowHeight = Screen.Height - inspectorPosY;
 

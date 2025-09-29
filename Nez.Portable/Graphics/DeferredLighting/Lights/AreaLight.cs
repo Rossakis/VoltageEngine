@@ -80,6 +80,18 @@ namespace Nez.DeferredLighting
 
 		float _areaWidth, _areaHeight;
 
+		public float RectangleWidth
+		{
+			get => _areaWidth;
+			set => SetWidth(value);
+		}
+		
+		public float RectangleHeight
+		{
+			get => _areaHeight;
+			set => SetHeight(value);
+		}
+
 		public AreaLight() : this(200, 200)
 		{
 		}

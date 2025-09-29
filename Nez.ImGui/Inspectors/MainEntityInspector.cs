@@ -25,8 +25,6 @@ public class MainEntityInspector
 	private float _minInspectorWidth = 1f;
 	private float _maxInspectorWidth = Screen.MonitorWidth;
 	public bool IsOpen { get; set; } = true; // Separate open/close flag
-	public static float MainInspectorPosY => 20f * ImGui.GetIO().FontGlobalScale;
-	public static float MainInspectorOffsetY => 24 * ImGui.GetIO().FontGlobalScale;
 	private readonly string _windowId = "MAIN_INSPECTOR_WINDOW";
 	private TransformInspector _transformInspector;
 	private List<IComponentInspector> _componentInspectors = new();
@@ -43,8 +41,6 @@ public class MainEntityInspector
 	// Prefab apply confirmation popup fields
 	private bool _showApplyToPrefabCopiesConfirmation = false;
 	private List<Entity> _prefabCopiesToModify = new();
-
-	private ImGuiManager _imGuiManager;
 
 	// Add these fields to MainEntityInspector
 	private bool _showApplyToOriginalPrefabConfirmation = false;
@@ -161,9 +157,9 @@ public class MainEntityInspector
 		_selectedEntities = _imguiManager.SceneGraphWindow.EntityPane.SelectedEntities.ToList();
 
 		var windowPosX = Screen.Width - _mainInspectorWidth;
-		var windowPosY = MainInspectorPosY;
+		var windowPosY = _imguiManager.MainWindowPositionY + 20f * _imguiManager.FontSizeMultiplier;
 		var windowWidth = _mainInspectorWidth;
-		var windowHeight = Screen.Height - MainInspectorPosY;
+		var windowHeight = Screen.Height - windowPosY;
 
 		ImGui.SetNextWindowPos(new Num.Vector2(windowPosX, windowPosY), ImGuiCond.FirstUseEver);
 		ImGui.SetNextWindowSize(new Num.Vector2(windowWidth, windowHeight), ImGuiCond.FirstUseEver);

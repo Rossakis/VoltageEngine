@@ -130,7 +130,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		float right = MainEntityInspector != null ? Screen.Width - MainEntityInspector.MainInspectorWidth : Screen.Width;
 		float availableWidth = right - left;
 		float posX = left;
-		float posY = Math.Max(SceneGraphWindow.SceneGraphPosY, MainEntityInspector.MainInspectorPosY);
+		float posY = Math.Max(SceneGraphWindow.SceneGraphPosY, MainWindowPositionY);
 
 		// Use all available width, and scale height to maintain aspect ratio
 		float gameWindowWidth = availableWidth;
