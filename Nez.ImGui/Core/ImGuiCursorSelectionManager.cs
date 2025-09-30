@@ -529,7 +529,7 @@ namespace Nez.ImGuiTools
 			var screenCenter = camera.WorldToScreenPoint(center);
 
 			float baseRadius = 30f;
-			float minRadius = 20f;
+			float minRadius = 28f;
 			float maxRadius = 33f;
 			float radius = baseRadius / MathF.Max(camera.RawZoom, 0.01f);
 			radius = Math.Clamp(radius, minRadius, maxRadius);

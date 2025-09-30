@@ -28,7 +28,7 @@ namespace Nez.ImGuiTools
 				_imguiManager = Core.GetGlobalManager<ImGuiManager>();
 
 			var windowPosX = Screen.Width - _imguiManager.InspectorTabWidth + _imguiManager.InspectorWidthOffset;
-			var windowPosY = _imguiManager.MainWindowPositionY + 20f * _imguiManager.FontSizeMultiplier;
+			var windowPosY = _imguiManager.MainWindowPositionY + 32f;
 			var windowWidth = _imguiManager.InspectorTabWidth - _imguiManager.InspectorWidthOffset;
 			var windowHeight = Screen.Height - windowPosY;
 
