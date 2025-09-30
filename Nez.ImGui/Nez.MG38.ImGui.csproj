@@ -31,6 +31,12 @@
 		<IsLinux Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Linux)))' == 'true'">true</IsLinux>
 	</PropertyGroup>
 
+	<ItemGroup>
+		<!-- Copy all files and subdirectories from ImGuiContent to output directory -->
+		<Content Include="ImGuiContent\**\*">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+	</ItemGroup>
 
 	<!-- Copy ImGui native code to output -->
 	<PropertyGroup>
@@ -54,6 +60,21 @@
 			<Link>%(Filename)%(Extension)</Link>
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Content Include="ImGuiContent\CursorSelection-UI-Normal.png">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </Content>
+	  <Content Include="ImGuiContent\CursorSelection-UI-Resize.png">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </Content>
+	  <Content Include="ImGuiContent\CursorSelection-UI-Rotate.png">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </Content>
+	  <Content Include="ImGuiContent\CursorSelection-UI.aseprite">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </Content>
 	</ItemGroup>
 
 	<ItemGroup>

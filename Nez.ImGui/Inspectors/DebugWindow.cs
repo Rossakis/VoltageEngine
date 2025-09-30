@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using ImGuiNET;
 using Nez;
+using Nez.ImGuiTools.Persistence;
+using Nez.ImGuiTools.Utils;
 using Nez.Utils;
 using Num = System.Numerics;
 
@@ -9,11 +11,11 @@ namespace Nez.ImGuiTools.Inspectors
 {
     public class DebugWindow
     {
-        private const int MaxMessages = 200;
+	    private readonly List<(Debug.LogType Type, string Message, int Count, DateTime LatestTimestamp)> _groupedBuffer = new();
+		private const int MaxMessages = 200;
         private ImGuiManager _imguiManager;
-        private bool _collapseText = true; 
-        private bool _groupLogs = false;   
-        private readonly List<(Debug.LogType Type, string Message, int Count, DateTime LatestTimestamp)> _groupedBuffer = new();
+        private PersistentBool _isGroupLogsOn = new("DebugWindow_GroupLogs", false);
+        private PersistentBool _isCollapseTextOn = new("DebugWindow_CollapseText", false);
 
         private static readonly Dictionary<Debug.LogType, Num.Vector4> LogTypeColors = new()
         {
@@ -46,10 +48,21 @@ namespace Nez.ImGuiTools.Inspectors
 
             // Controls row
             ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new Num.Vector2(4, 4));
-            ImGui.Checkbox("Collapse Text", ref _collapseText);
+            
+			bool collapseText = _isCollapseTextOn.Value;
+			if (ImGui.Checkbox("Collapse Text", ref collapseText))
+			{
+				_isCollapseTextOn.Value = collapseText;
+			}
             ImGui.SameLine();
-            ImGui.Checkbox("Group Logs", ref _groupLogs);
-            ImGui.SameLine();
+
+			bool groupLogsValue = _isGroupLogsOn.Value;
+			if (ImGui.Checkbox("Group Logs", ref groupLogsValue))
+			{
+				_isGroupLogsOn.Value = groupLogsValue; 
+			}
+
+			ImGui.SameLine();
             if (ImGui.Button("Clear"))
             {
                 Debug.ClearLogEntries();
@@ -63,11 +76,10 @@ namespace Nez.ImGuiTools.Inspectors
 
             ImGui.BeginChild("DebugLogScroll", new Num.Vector2(0, -ImGui.GetFrameHeightWithSpacing()), true, ImGuiWindowFlags.HorizontalScrollbar);
 
-            if (_groupLogs)
+            if (groupLogsValue)
             {
-                // Group by message and type, ignoring timestamp
                 _groupedBuffer.Clear();
-                // Use a dictionary to group by (Type, Message)
+
                 var groupDict = new Dictionary<(Debug.LogType, string), (int Count, DateTime LatestTimestamp)>();
                 for (int i = startIdx; i < logEntries.Count; i++)
                 {
@@ -97,7 +109,7 @@ namespace Nez.ImGuiTools.Inspectors
                     if (group.Count > 1)
                         text += $"  (x{group.Count})";
 
-                    if (_collapseText)
+                    if (collapseText)
                     {
                         ImGui.PushTextWrapPos(0.0f);
                         ImGui.TextColored(color, text);
@@ -117,7 +129,7 @@ namespace Nez.ImGuiTools.Inspectors
                     var color = LogTypeColors.TryGetValue(entry.Type, out var c) ? c : LogTypeColors[Debug.LogType.Log];
                     string text = $"[{entry.Timestamp:HH:mm:ss}] {entry.Message}";
 
-                    if (_collapseText)
+                    if (collapseText)
                     {
                         ImGui.PushTextWrapPos(0.0f);
                         ImGui.TextColored(color, text);

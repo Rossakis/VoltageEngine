@@ -211,7 +211,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		_cursorSelectionManager = new ImGuiCursorSelectionManager(this);
 
 		_imageLoader = new ImguiImageLoader();
-		_imageLoader.LoadSelectionModeIcons(_renderer);
+		_imageLoader.LoadCursorModeIcons(_renderer);
 
 		// Create default Main Entity Inspector window when current scene is finished loading the entities
 		Scene.OnFinishedAddingEntitiesWithData += OpenMainEntityInspector;
@@ -405,14 +405,14 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 			normalButtonColor = ImGui.GetStyle().Colors[(int)ImGuiCol.Button];
 
 		ImGui.PushStyleColor(ImGuiCol.Button, normalButtonColor);
-		bool normalHovered = ImGui.ImageButton("Normal", _imageLoader.NormalIconID, new Num.Vector2(iconSize, iconSize));
+		bool normalHovered = ImGui.ImageButton("Normal", _imageLoader.NormalCursorIconID, new Num.Vector2(iconSize, iconSize));
 		if (normalHovered)
 			_cursorSelectionManager.SelectionMode = CursorSelectionMode.Normal;
 		ImGui.PopStyleColor();
 
 		if (ImGui.IsItemHovered())
 		{
-			ImGui.SetTooltip("Normal (1)");
+			ImGui.SetTooltip("Normal Cursor (Press Q or 1)");
 		}
 		ImGui.SameLine(0, spacing);
 
@@ -424,14 +424,14 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 			resizeButtonColor = ImGui.GetStyle().Colors[(int)ImGuiCol.Button];
 
 		ImGui.PushStyleColor(ImGuiCol.Button, resizeButtonColor);
-		bool resizeHovered = ImGui.ImageButton("Resize", _imageLoader.ResizeIconID, new Num.Vector2(iconSize, iconSize));
+		bool resizeHovered = ImGui.ImageButton("Resize", _imageLoader.ResizeCursorIconID, new Num.Vector2(iconSize, iconSize));
 		if (resizeHovered)
 			_cursorSelectionManager.SelectionMode = CursorSelectionMode.Resize;
 		ImGui.PopStyleColor();
 
 		if (ImGui.IsItemHovered())
 		{
-			ImGui.SetTooltip("Resize (2)");
+			ImGui.SetTooltip("Resize Cursor (Press E or 2)");
 		}
 		ImGui.SameLine(0, spacing);
 
@@ -443,14 +443,14 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 			rotateButtonColor = ImGui.GetStyle().Colors[(int)ImGuiCol.Button];
 
 		ImGui.PushStyleColor(ImGuiCol.Button, rotateButtonColor);
-		bool rotateHovered = ImGui.ImageButton("Rotate", _imageLoader.RotateIconID, new Num.Vector2(iconSize, iconSize));
+		bool rotateHovered = ImGui.ImageButton("Rotate", _imageLoader.RotateCursorIconID, new Num.Vector2(iconSize, iconSize));
 		if (rotateHovered)
 			_cursorSelectionManager.SelectionMode = CursorSelectionMode.Rotate;
 		ImGui.PopStyleColor();
 
 		if (ImGui.IsItemHovered())
 		{
-			ImGui.SetTooltip("Rotate (3)");
+			ImGui.SetTooltip("Rotate Cursor (Press R or 3)");
 		}
 
 		ImGui.End();

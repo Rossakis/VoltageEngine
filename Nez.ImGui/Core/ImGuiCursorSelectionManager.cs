@@ -71,18 +71,17 @@ namespace Nez.ImGuiTools
 		/// </summary>
 		public void UpdateSelection()
 		{
-			if (ImGui.IsKeyPressed(ImGuiKey._1))
+			if (ImGui.IsKeyPressed(ImGuiKey._1) || ImGui.IsKeyPressed(ImGuiKey.Q))
 				SelectionMode = CursorSelectionMode.Normal;
-			else if (ImGui.IsKeyPressed(ImGuiKey._2))
+			else if (ImGui.IsKeyPressed(ImGuiKey._2) || ImGui.IsKeyPressed(ImGuiKey.E))
 				SelectionMode = CursorSelectionMode.Resize;
-			else if (ImGui.IsKeyPressed(ImGuiKey._3))
+			else if (ImGui.IsKeyPressed(ImGuiKey._3) || ImGui.IsKeyPressed(ImGuiKey.R))
 				SelectionMode = CursorSelectionMode.Rotate;
 
 			UpdateModifierKeys();
 
 			if (_imGuiManager.IsGameWindowFocused && IsCursorWithinGameWindow())
 			{
-
 				if (SelectionMode == CursorSelectionMode.Normal)
 					DrawEntityArrowsGizmo();
 				else if (SelectionMode == CursorSelectionMode.Resize)
@@ -90,9 +89,8 @@ namespace Nez.ImGuiTools
 				else if (SelectionMode == CursorSelectionMode.Rotate)
 					DrawEntityRotateGizmo();
 
-				if (!IsMouseOverGizmo)
+				if (!IsMouseOverGizmo && Core.IsEditMode)
 					HandleBoxSelection(); // Don't make the box selection if the mouse is over the gizmo or in Play Mode
-
 
 				if (Input.DoubleLeftMouseButtonPressed)
 				{
