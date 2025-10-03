@@ -332,16 +332,15 @@ namespace Nez.ImGuiTools
 		private void DrawEntityArrowsGizmo()
 		{
 			var entityPane = _imGuiManager.SceneGraphWindow.EntityPane;
-			var selectedEntities = entityPane.SelectedEntities;
 			IsMouseOverGizmo = false;
 
-			if (selectedEntities.Count == 0 || !Core.IsEditMode)
+			if (entityPane.SelectedEntities.Count == 0 || !Core.IsEditMode)
 				return;
 
 			Vector2 center = Vector2.Zero;
-			foreach (var e in selectedEntities)
+			foreach (var e in entityPane.SelectedEntities)
 				center += e.Transform.Position;
-			center /= selectedEntities.Count;
+			center /= entityPane.SelectedEntities.Count;
 
 			var camera = Core.Scene.Camera;
 			float baseLength = 30f;
@@ -512,16 +511,15 @@ namespace Nez.ImGuiTools
 		private void DrawEntityRotateGizmo()
 		{
 			var entityPane = _imGuiManager.SceneGraphWindow.EntityPane;
-			var selectedEntities = entityPane.SelectedEntities;
 			IsMouseOverGizmo = false;
 
-			if (selectedEntities.Count == 0 || !Core.IsEditMode)
+			if (entityPane.SelectedEntities.Count == 0 || !Core.IsEditMode)
 				return;
 
 			Vector2 center = Vector2.Zero;
-			foreach (var e in selectedEntities)
+			foreach (var e in entityPane.SelectedEntities)
 				center += e.Transform.Position;
-			center /= selectedEntities.Count;
+			center /= entityPane.SelectedEntities.Count;
 
 			var camera = Core.Scene.Camera;
 			var screenCenter = camera.WorldToScreenPoint(center);
@@ -551,7 +549,7 @@ namespace Nez.ImGuiTools
 			Debug.DrawCircle(center, radius / camera.RawZoom, circleColor);
 
 			// Draw up (Y) and right (X) axes for visual reference only
-			DrawRotateGizmoAxesUpRight(center, radius, camera, selectedEntities[0].Transform.Rotation);
+			DrawRotateGizmoAxesUpRight(center, radius, camera, entityPane.SelectedEntities[0].Transform.Rotation);
 
 			// Start rotation only if mouse is inside the circle
 			if (!_draggingRotate && hoveredCircle && Input.LeftMouseButtonPressed)
@@ -559,7 +557,7 @@ namespace Nez.ImGuiTools
 				_draggingRotate = true;
 				_dragStartMousePos = mousePos;
 				_dragStartAngle = MathF.Atan2(mousePos.Y - screenCenter.Y, mousePos.X - screenCenter.X);
-				_dragStartEntityRotation = selectedEntities[0].Transform.Rotation;
+				_dragStartEntityRotation = entityPane.SelectedEntities[0].Transform.Rotation;
 			}
 
 			// Apply rotation as long as we're dragging inside the circle
@@ -571,7 +569,7 @@ namespace Nez.ImGuiTools
 				if (deltaAngle > MathF.PI) deltaAngle -= MathF.PI * 2;
 				if (deltaAngle < -MathF.PI) deltaAngle += MathF.PI * 2;
 
-				foreach (var entity in selectedEntities)
+				foreach (var entity in entityPane.SelectedEntities)
 					entity.Transform.Rotation = _dragStartEntityRotation + deltaAngle;
 
 				ImGui.SetMouseCursor(ImGuiMouseCursor.ResizeNS);
@@ -583,13 +581,13 @@ namespace Nez.ImGuiTools
 
 				var startRotations = new Dictionary<Entity, float>();
 				var endRotations = new Dictionary<Entity, float>();
-				foreach (var entity in selectedEntities)
+				foreach (var entity in entityPane.SelectedEntities)
 				{
 					startRotations[entity] = _dragStartEntityRotation;
 					endRotations[entity] = entity.Transform.Rotation;
 				}
 
-				bool anyRotated = selectedEntities.Any(e =>
+				bool anyRotated = entityPane.SelectedEntities.Any(e =>
 					startRotations.TryGetValue(e, out var startRot) &&
 					endRotations.TryGetValue(e, out var endRot) &&
 					startRot != endRot
@@ -599,13 +597,13 @@ namespace Nez.ImGuiTools
 				{
 					EditorChangeTracker.PushUndo(
 						new MultiEntityRotationUndoAction(
-							selectedEntities.ToList(),
+							entityPane.SelectedEntities.ToList(),
 							startRotations,
 							endRotations,
-							$"Rotated {string.Join(", ", selectedEntities.Select(e => e.Name))}"
+							$"Rotated {string.Join(", ", entityPane.SelectedEntities.Select(e => e.Name))}"
 						),
-						selectedEntities.First(),
-						$"Rotated {string.Join(", ", selectedEntities.Select(e => e.Name))}"
+						entityPane.SelectedEntities.First(),
+						$"Rotated {string.Join(", ", entityPane.SelectedEntities.Select(e => e.Name))}"
 					);
 				}
 			}
@@ -634,17 +632,16 @@ namespace Nez.ImGuiTools
 		private void DrawEntityScaleGizmo()
 		{
 			var entityPane = _imGuiManager.SceneGraphWindow.EntityPane;
-			var selectedEntities = entityPane.SelectedEntities;
 			IsMouseOverGizmo = false;
 
-			if (selectedEntities.Count == 0 || !Core.IsEditMode)
+			if (entityPane.SelectedEntities.Count == 0 || !Core.IsEditMode)
 				return;
 
 			// Compute center of all selected entities
 			Vector2 center = Vector2.Zero;
-			foreach (var e in selectedEntities)
+			foreach (var e in entityPane.SelectedEntities)
 				center += e.Transform.Position;
-			center /= selectedEntities.Count;
+			center /= entityPane.SelectedEntities.Count;
 
 			var camera = Core.Scene.Camera;
 			float baseLength = 30f;

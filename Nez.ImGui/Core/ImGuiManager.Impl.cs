@@ -45,7 +45,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		ShowStyleEditor = KeyValueDataStore.Default.GetBool(kShowStyleEditor, ShowStyleEditor);
 		ShowSceneGraphWindow = KeyValueDataStore.Default.GetBool(kShowSceneGraphWindow, ShowSceneGraphWindow);
 		ShowCoreWindow = KeyValueDataStore.Default.GetBool(kShowCoreWindow, ShowCoreWindow);
-		ShowSeperateGameWindow = KeyValueDataStore.Default.GetBool(kShowSeperateGameWindow, ShowSeperateGameWindow);
+		ShowSeparateGameWindow = KeyValueDataStore.Default.GetBool(kShowSeperateGameWindow, ShowSeparateGameWindow);
 
 		Core.Emitter.AddObserver(CoreEvents.Exiting, PersistSettings);
 	}
@@ -55,7 +55,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		KeyValueDataStore.Default.Set(kShowStyleEditor, ShowStyleEditor);
 		KeyValueDataStore.Default.Set(kShowSceneGraphWindow, ShowSceneGraphWindow);
 		KeyValueDataStore.Default.Set(kShowCoreWindow, ShowCoreWindow);
-		KeyValueDataStore.Default.Set(kShowSeperateGameWindow, ShowSeperateGameWindow);
+		KeyValueDataStore.Default.Set(kShowSeperateGameWindow, ShowSeparateGameWindow);
 
 		KeyValueDataStore.Default.Flush(Core.Services.GetOrAddService<FileDataStore>());
 	}
@@ -540,7 +540,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		RenderTarget2D source, Rectangle finalRenderDestinationRect,
 		SamplerState samplerState)
 	{
-		if (ShowSeperateGameWindow)
+		if (ShowSeparateGameWindow)
 		{
 			if (_lastRenderTarget != source)
 			{

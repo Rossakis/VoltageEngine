@@ -23,14 +23,18 @@ public class EntityPane
 
     private const int MIN_ENTITIES_FOR_CLIPPER = 100;
     private Entity _previousEntity;
-	public IReadOnlyList<Entity> SelectedEntities => _selectedEntities;
+	public List<Entity> SelectedEntities => _selectedEntities;
+	private ImGuiManager _imGuiManager;
+	private List<Entity> _copiedEntities = new();
+	private List<Entity> _selectedEntities = new();
+	private Entity _lastRangeSelectEntity;
 
 	public void SetSelectedEntity(Entity entity, bool ctrlDown, bool shiftDown = false)
 	{
 		if (entity == null && !ctrlDown && !shiftDown)
 			return;
 
-		var hierarchyList = Core.GetGlobalManager<ImGuiManager>().SceneGraphWindow.BuildHierarchyList();
+		var hierarchyList = _imGuiManager.SceneGraphWindow.BuildHierarchyList();
 
 		if (shiftDown && _lastRangeSelectEntity != null)
 		{
@@ -73,11 +77,6 @@ public class EntityPane
 			_lastRangeSelectEntity = entity;
 		}
 	}
-	private ImGuiManager _imGuiManager;
-    private List<Entity> _copiedEntities = new();
-    private List<Entity> _selectedEntities = new();
-	private Entity _lastRangeSelectEntity;
-
 	#endregion
 
 	#region Main Draw Entry Point
@@ -658,7 +657,6 @@ public class EntityPane
 				$"Created: {clone.Name}"
 			);
 
-			//SetSelectedEntity(clone);
 			_imGuiManager.MainEntityInspector.DelayedSetEntity(clone);
 			
 			return clone;

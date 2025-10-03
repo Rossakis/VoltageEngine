@@ -22,11 +22,12 @@ namespace Nez.ImGuiTools;
 
 public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDisposable
 {
+	// Public values
 	public bool ShowDemoWindow = false;
 	public bool ShowStyleEditor = false;
 	public bool ShowSceneGraphWindow = true;
 	public bool ShowCoreWindow = true;
-	public bool ShowSeperateGameWindow = true;
+	public bool ShowSeparateGameWindow = true;
 	public bool ShowAnimationEventInspector = false;
 	public bool ShowMenuBar = true;
 
@@ -39,20 +40,27 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	public bool FocusGameWindowOnRightClick = false;
 	public bool DisableKeyboardInputWhenGameWindowUnfocused = true;
 	public bool DisableMouseWheelWhenGameWindowUnfocused = true;
+	public float GameWindowWidth { get; private set; }
+	public float GameWindowHeight { get; private set; }
 
-	private List<Type> _sceneSubclasses = new();
-	private System.Reflection.MethodInfo[] _themes;
+	public float FontSizeMultiplier => ImGui.GetIO().FontGlobalScale;
 
-	private CoreWindow _coreWindow = new();
-	private DebugWindow _debugWindow = new();
+	// Public instances
+	public ImGuiCursorSelectionManager CursorSelectionManager => _cursorSelectionManager;
+	public ImguiImageLoader ImageLoader => _imageLoader;
 	public SceneGraphWindow SceneGraphWindow { get; private set; }
 	public MainEntityInspector MainEntityInspector { get; private set; }
-
+	public bool IsInspectorTabLocked = false;
 	public AnimationEventInspector AnimationEventInspectorInstance
 	{
 		get => _animationEventInspector;
 		private set => _animationEventInspector = value;
 	}
+
+	private List<Type> _sceneSubclasses = new();
+	private System.Reflection.MethodInfo[] _themes;
+	private CoreWindow _coreWindow = new();
+	private DebugWindow _debugWindow = new();
 
 	private Num.Vector2 normalEntityInspectorStartPos;
 	private int entitynspectorInitialSpawnOffset = 0;
@@ -65,9 +73,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	private ImGuiRenderer _renderer;
 	private ImGuiInput _input = new ImGuiInput();
 	private ImGuiCursorSelectionManager _cursorSelectionManager;
-	public ImGuiCursorSelectionManager CursorSelectionManager => _cursorSelectionManager;
 	private ImguiImageLoader _imageLoader;
-	private Num.Vector2 _gameWindowFirstPosition;
 	private string _gameWindowTitle;
 	private ImGuiWindowFlags _gameWindowFlags = 0;
 
@@ -76,17 +82,16 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	private Num.Vector2? _gameViewForcedSize;
 	private WindowPosition? _gameViewForcedPos;
 	private float _mainMenuBarHeight;
-	public float GameWindowWidth { get; private set; }
-	public float GameWindowHeight { get; private set; }
+	private readonly float _editorToolsBarHeight = 30f;
 
 	#region Inspector Tab
 	public float InspectorTabWidth => _inspectorTabWidth;
 	private float _inspectorTabWidth = 500f;
-	private float _minInspectorWidth = 1f;
-	private float _maxInspectorWidth = Screen.MonitorWidth;
+	private readonly float _minInspectorWidth = 1f;
+	private readonly float _maxInspectorWidth = Screen.MonitorWidth;
 	public float InspectorWidthOffset = 4f; // offset the inner windows (core, entity inspector) to allow for edge selecting 
 	
-	private enum InspectorTab
+	public enum InspectorTab
 	{
 		EntityInspector,
 		Core,
@@ -94,7 +99,16 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	}
 
 	private InspectorTab _selectedInspectorTab = InspectorTab.EntityInspector;
-
+	public InspectorTab SelectedInspectorTab
+	{
+		get => _selectedInspectorTab;
+		set
+		{
+			if(IsInspectorTabLocked)
+				return;
+			_selectedInspectorTab = value;
+		}
+	}
 	#endregion
 
 
@@ -108,11 +122,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	public static float EditModeCameraMaxSpeed = 3000f;
 	private static float _dynamicCameraSpeed = EditModeCameraSpeed; // Current dynamic speed
 	private const float CameraSpeedAdjustmentStep = 20f; // How much to change per scroll
-
 	public static float CurrentCameraSpeed { get; private set; }
-	public float FontSizeMultiplier => ImGui.GetIO().FontGlobalScale;
-
-	private float _editorToolsBarHeight = 30f;
 
 	public Vector2 CameraTargetPosition
 	{
@@ -128,6 +138,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	private Vector2 _cameraDragStartMouse;
 	private Vector2 _cameraDragStartPosition;
 
+	// Before game exits, we may need to prompt to save changes (aka, pending actions)
 	private bool _pendingExit = false;
 	private bool _pendingSceneChange = false;
 	private Type _requestedSceneType = null;
@@ -184,7 +195,6 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		if (options == null)
 			options = new ImGuiOptions();
 
-		_gameWindowFirstPosition = options._gameWindowFirstPosition;
 		_gameWindowTitle = options._gameWindowTitle;
 		_gameWindowFlags = options._gameWindowFlags;
 		_gameViewForcedPos = WindowPosition.Top;
@@ -211,7 +221,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		_cursorSelectionManager = new ImGuiCursorSelectionManager(this);
 
 		_imageLoader = new ImguiImageLoader();
-		_imageLoader.LoadCursorModeIcons(_renderer);
+		_imageLoader.LoadImages(_renderer);
 
 		// Create default Main Entity Inspector window when current scene is finished loading the entities
 		Scene.OnFinishedAddingEntitiesWithData += OpenMainEntityInspector;
@@ -233,7 +243,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 
 		DrawEditorToolsBar();
 
-		if (ShowSeperateGameWindow)
+		if (ShowSeparateGameWindow)
 			DrawGameWindow();
 
 		SceneGraphWindow.Show(ref ShowSceneGraphWindow);
@@ -369,7 +379,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 				ImGui.Separator();
 				ImGui.MenuItem("Core Window", null, ref ShowCoreWindow);
 				ImGui.MenuItem("Scene Graph Window", null, ref ShowSceneGraphWindow);
-				ImGui.MenuItem("Separate Game Window", null, ref ShowSeperateGameWindow);
+				ImGui.MenuItem("Separate Game Window", null, ref ShowSeparateGameWindow);
 				ImGui.MenuItem("Animation Event Inspector", null, ref ShowAnimationEventInspector);
 				ImGui.EndMenu();
 			}
@@ -483,13 +493,13 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		Num.Vector4 defaultColor = ImGui.GetStyle().Colors[(int)ImGuiCol.Button];
 
 		// Entity Inspector Tab
-		if (_selectedInspectorTab == InspectorTab.EntityInspector)
+		if (SelectedInspectorTab == InspectorTab.EntityInspector)
 			ImGui.PushStyleColor(ImGuiCol.Button, selectedColor);
 		else
 			ImGui.PushStyleColor(ImGuiCol.Button, defaultColor);
 
 		if (ImGui.Button("Inspector"))
-			_selectedInspectorTab = InspectorTab.EntityInspector;
+			SelectedInspectorTab = InspectorTab.EntityInspector;
 		if (ImGui.IsItemHovered())
 			ImGui.SetTooltip("Show Entity Inspector");
 
@@ -498,13 +508,13 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 
 		if (ShowCoreWindow)
 		{
-			if (_selectedInspectorTab == InspectorTab.Core)
+			if (SelectedInspectorTab == InspectorTab.Core)
 				ImGui.PushStyleColor(ImGuiCol.Button, selectedColor);
 			else
 				ImGui.PushStyleColor(ImGuiCol.Button, defaultColor);
 
 			if (ImGui.Button("Core"))
-				_selectedInspectorTab = InspectorTab.Core;
+				SelectedInspectorTab = InspectorTab.Core;
 			if (ImGui.IsItemHovered())
 				ImGui.SetTooltip("Show Core Window");
 
@@ -512,13 +522,13 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 			ImGui.SameLine(0, tabSpacing);
 		}
 
-		if (_selectedInspectorTab == InspectorTab.Debug)
+		if (SelectedInspectorTab == InspectorTab.Debug)
 			ImGui.PushStyleColor(ImGuiCol.Button, selectedColor);
 		else
 			ImGui.PushStyleColor(ImGuiCol.Button, defaultColor);
 
 		if (ImGui.Button("Debug"))
-			_selectedInspectorTab = InspectorTab.Debug;
+			SelectedInspectorTab = InspectorTab.Debug;
 		if (ImGui.IsItemHovered())
 			ImGui.SetTooltip("Show Debug messages");
 
@@ -526,15 +536,15 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		ImGui.Separator();
 		ImGui.End();
 
-		if (_selectedInspectorTab == InspectorTab.EntityInspector && MainEntityInspector != null && MainEntityInspector.IsOpen)
+		if (SelectedInspectorTab == InspectorTab.EntityInspector && MainEntityInspector != null && MainEntityInspector.IsOpen)
 		{
 			MainEntityInspector.Draw();
 		}
-		else if(_selectedInspectorTab == InspectorTab.Core && ShowCoreWindow)
+		else if(SelectedInspectorTab == InspectorTab.Core && ShowCoreWindow)
 		{
 			_coreWindow.Show(ref ShowCoreWindow);
 		}
-		else if (_selectedInspectorTab == InspectorTab.Debug)
+		else if (SelectedInspectorTab == InspectorTab.Debug)
 		{
 			_debugWindow.Draw();
 		}
@@ -737,6 +747,9 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	/// <param name="entity"></param>
 	public void OpenMainEntityInspector(Entity entity = null)
 	{
+		if (IsInspectorTabLocked)
+			return;
+
 		if (MainEntityInspector != null)
 		{
 			if (MainEntityInspector.Entity == entity)
@@ -798,13 +811,6 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 	{
 		MainEntityInspector?.RefreshComponentInspectors();
 	}
-
-	#endregion
-
-	#region Entity Selection
-
-	// Remove the entire #region Entity Selection
-	// (TrySelectEntityAtMouse, SetCameraTargetPosition, DeselectEntity)
 
 	#endregion
 
@@ -906,19 +912,17 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 
 	public void DrawSelectedEntityOutlines()
 	{
-		var selectedEntities = SceneGraphWindow.EntityPane.SelectedEntities;
-
 		// Only update cache if selection changed
-		if (_lastSelectedEntities == null || !selectedEntities.SequenceEqual(_lastSelectedEntities))
+		if (_lastSelectedEntities == null || !SceneGraphWindow.EntityPane.SelectedEntities.SequenceEqual(_lastSelectedEntities))
 		{
 			_highlightedEntities.Clear();
-			foreach (var entity in selectedEntities)
+			foreach (var entity in SceneGraphWindow.EntityPane.SelectedEntities)
 			{
 				var collider = entity.GetComponent<Collider>();
 				_highlightedEntities.Add((entity, collider));
 			}
 
-			_lastSelectedEntities = selectedEntities.ToList();
+			_lastSelectedEntities = SceneGraphWindow.EntityPane.SelectedEntities.ToList();
 		}
 
 		// Draw highlights using cached info

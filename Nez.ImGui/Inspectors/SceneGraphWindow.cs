@@ -549,8 +549,7 @@ public class SceneGraphWindow
 	private void HandleEntitySelectionNavigation()
 	{
 		// Use the first selected entity for navigation
-		var selectedEntities = EntityPane.SelectedEntities;
-		var selectedEntity = selectedEntities.FirstOrDefault();
+		var selectedEntity = _imGuiManager.SceneGraphWindow.EntityPane.SelectedEntities.FirstOrDefault();
 
 		if (!Core.IsEditMode || selectedEntity == null || !ImGui.IsWindowFocused(ImGuiFocusedFlags.AnyWindow))
 			return; 

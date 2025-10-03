@@ -333,4 +333,24 @@ public sealed class AsepriteFile
 		texture.SetData<Color>(pixels);
 		return texture;
 	}
+
+	public Texture2D GetTextureFromLayers(string layer, int frameNumber = 1, bool onlyVisibleLayers = true, bool includeBackgroundLayer = false)
+	{
+		int frameIndex = frameNumber - 1;
+		// Validate frame number
+		if (frameNumber < 0 || frameIndex >= Frames.Count)
+		{
+			throw new ArgumentOutOfRangeException(nameof(frameNumber),
+				$"Frame number {frameNumber} is out of range. File has {Frames.Count} frames.");
+		}
+
+		var frame = Frames[frameIndex];
+		var pixels = frame.FlattenFrame(onlyVisibleLayers, includeBackgroundLayer, layer);
+
+		// Create texture from the flattened pixel data
+		var texture = new Texture2D(Core.GraphicsDevice, frame.Width, frame.Height);
+		texture.SetData<Color>(pixels);
+
+		return texture;
+	}
 }

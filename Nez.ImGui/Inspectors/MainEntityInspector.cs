@@ -1,17 +1,16 @@
 using ImGuiNET;
+using Nez.Editor;
+using Nez.ImGuiTools.Inspectors.ObjectInspectors;
 using Nez.ImGuiTools.ObjectInspectors;
 using Nez.ImGuiTools.UndoActions;
+using Nez.Persistence;
 using Nez.Utils;
 using Nez.Utils.Coroutines;
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using System.IO;
-using Nez.Editor;
-using Nez.ImGuiTools.Inspectors.ObjectInspectors;
-using Nez.ImGuiTools.TypeInspectors;
-using Nez.Persistence;
+using System.Linq;
 using Num = System.Numerics;
 
 namespace Nez.ImGuiTools;
@@ -19,58 +18,48 @@ namespace Nez.ImGuiTools;
 public class MainEntityInspector
 {
 	public Entity Entity { get; private set; }
-	public float Width { get; set; } = 500f; // Persist this separately
-	
-	public bool IsOpen { get; set; } = true; // Separate open/close flag
+	public float Width { get; set; } = 500f; 
+	public bool IsOpen { get; set; } = true; 
+
 	private TransformInspector _transformInspector;
 	private List<IComponentInspector> _componentInspectors = new();
+	private ImGuiManager _imguiManager;
 
 	private bool _isEditingUpdateInterval = false;
 	private uint _updateIntervalEditStartValue;
 	private bool _isEditingName = false;
 	private string _nameEditStartValue;
 
-	// Prefab creation popup fields
+	// Prefab creation / confirmation popup fields
 	private string _prefabName = "";
-	private ImGuiManager _imguiManager;
-
-	// Prefab apply confirmation popup fields
 	private bool _showApplyToPrefabCopiesConfirmation = false;
 	private List<Entity> _prefabCopiesToModify = new();
-
-	// Add these fields to MainEntityInspector
 	private bool _showApplyToOriginalPrefabConfirmation = false;
-
-	// New fields for multi-entity selection
-	private List<Entity> _selectedEntities = new();
+	private ImGuiManager _imGuiManager;
+	private Entity _lockedEntity;
 
 	public MainEntityInspector(Entity entity = null)
 	{
+		_imGuiManager = Core.GetGlobalManager<ImGuiManager>();
+
 		Entity = entity;
 		_componentInspectors.Clear();
 
-		// Get selected entities from ImGuiManager
-		var imGuiManager = Core.GetGlobalManager<ImGuiManager>();
-		if (imGuiManager != null)
-			_selectedEntities = imGuiManager.SceneGraphWindow.EntityPane.SelectedEntities.ToList();
-		else
-			_selectedEntities = entity != null ? new List<Entity> { entity } : new List<Entity>();
-
-		if (_selectedEntities.Count == 1 && Entity != null)
+		if (_imGuiManager.SceneGraphWindow.EntityPane.SelectedEntities.Count == 1 && Entity != null)
 		{
 			_transformInspector = new TransformInspector(Entity.Transform);
 			for (var i = 0; i < Entity.Components.Count; i++)
 				_componentInspectors.Add(ComponentInspectorFactory.CreateInspector(Entity.Components[i])); // Use factory here
 		}
-		else if (_selectedEntities.Count > 1)
+		else if (_imGuiManager.SceneGraphWindow.EntityPane.SelectedEntities.Count > 1)
 		{
 			// For multiple selection, find common components
-			var commonComponents = GetCommonComponents(_selectedEntities);
+			var commonComponents = GetCommonComponents(_imGuiManager.SceneGraphWindow.EntityPane.SelectedEntities);
 			_componentInspectors.Clear();
 			foreach (var compType in commonComponents)
 			{
 				// Create a MultiComponentInspector for each common type
-				var multiInspector = new MultiComponentInspector(compType, _selectedEntities);
+				var multiInspector = new MultiComponentInspector(compType, _imGuiManager.SceneGraphWindow.EntityPane.SelectedEntities);
 				_componentInspectors.Add(multiInspector);
 			}
 		}
@@ -120,37 +109,40 @@ public class MainEntityInspector
 
 	public void SetEntity(Entity entity)
 	{
+		if (_imguiManager.IsInspectorTabLocked)
+		{
+			return;
+		}
+
 		Entity = entity;
-		var imGuiManager = Core.GetGlobalManager<ImGuiManager>();
-		_selectedEntities = imGuiManager?.SceneGraphWindow.EntityPane.SelectedEntities.ToList() ?? (entity != null ? new List<Entity> { entity } : new List<Entity>());
 		_componentInspectors.Clear();
 		_transformInspector = null;
 
-		if (_selectedEntities.Count == 1 && Entity != null)
+		if (_imGuiManager.SceneGraphWindow.EntityPane.SelectedEntities.Count == 1 && Entity != null)
 		{
 			_transformInspector = new TransformInspector(Entity.Transform);
 			RefreshComponentInspectors();
 		}
-		else if (_selectedEntities.Count > 1)
+		else if (_imGuiManager.SceneGraphWindow.EntityPane.SelectedEntities.Count > 1)
 		{
-			var commonComponents = GetCommonComponents(_selectedEntities);
+			var commonComponents = GetCommonComponents(_imGuiManager.SceneGraphWindow.EntityPane.SelectedEntities);
 			foreach (var compType in commonComponents)
 			{
-				var multiInspector = new MultiComponentInspector(compType, _selectedEntities);
+				var multiInspector = new MultiComponentInspector(compType, _imGuiManager.SceneGraphWindow.EntityPane.SelectedEntities);
 				_componentInspectors.Add(multiInspector);
 			}
 		}
 	}
 
-	public void Draw(ImGuiWindowFlags windowFlags = ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoResize)
+	public void Draw(
+		ImGuiWindowFlags windowFlags = ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoCollapse |
+		                               ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoResize)
 	{
 		if (!IsOpen)
 			return;
 
 		if (_imguiManager == null)
 			_imguiManager = Core.GetGlobalManager<ImGuiManager>();
-
-		_selectedEntities = _imguiManager.SceneGraphWindow.EntityPane.SelectedEntities.ToList();
 
 		var windowPosX = Screen.Width - _imguiManager.InspectorTabWidth + _imguiManager.InspectorWidthOffset;
 		var windowPosY = _imguiManager.MainWindowPositionY + 32f;
@@ -165,7 +157,7 @@ public class MainEntityInspector
 		if (ImGui.Begin("##MainEntityInspector", ref open, windowFlags))
 		{
 			// If more than one entity is selected
-			if (_selectedEntities.Count > 1)
+			if (_imGuiManager.SceneGraphWindow.EntityPane.SelectedEntities.Count > 1 && !_imguiManager.IsInspectorTabLocked)
 			{
 				ImGui.SetWindowFontScale(1.5f);
 				ImGui.Text("Multiple Entities Selected");
@@ -173,10 +165,11 @@ public class MainEntityInspector
 
 				ImGui.PushFont(ImGui.GetIO().FontDefault); // Use default font (smallest)
 				ImGui.PushStyleColor(ImGuiCol.Text, new Num.Vector4(0.8f, 0.8f, 0.8f, 1.0f));
-				for (int i = 0; i < _selectedEntities.Count; i++)
+				for (int i = 0; i < _imGuiManager.SceneGraphWindow.EntityPane.SelectedEntities.Count; i++)
 				{
-					ImGui.Text($"{i + 1}. {_selectedEntities[i].Name}");
+					ImGui.Text($"{i + 1}. {_imGuiManager.SceneGraphWindow.EntityPane.SelectedEntities[i].Name}");
 				}
+
 				ImGui.PopStyleColor();
 				ImGui.PopFont();
 
@@ -189,12 +182,48 @@ public class MainEntityInspector
 					NezImGui.MediumVerticalSpace();
 				}
 			}
-			else if (_selectedEntities.Count == 1 && Entity != null)
+			else if ((_imGuiManager.SceneGraphWindow.EntityPane.SelectedEntities.Count == 1 && Entity != null) 
+			         || _lockedEntity != null)
 			{
 				var entityName = Entity.Name;
 				ImGui.SetWindowFontScale(1.5f);
 				ImGui.Text(entityName);
 				ImGui.SetWindowFontScale(1.0f);
+
+				float spacing = 12f * _imguiManager.FontSizeMultiplier;
+				float iconSize = 20f * _imguiManager.FontSizeMultiplier;
+				ImGui.SameLine(0, spacing);
+
+				// Lock Mode Button
+				System.Numerics.Vector4 lockedButtonColor;
+				if (_imguiManager.IsInspectorTabLocked)
+				{
+					lockedButtonColor = new System.Numerics.Vector4(0.2f, 0.5f, 1f, 1f); // blue
+					ImGui.PushStyleColor(ImGuiCol.Button, lockedButtonColor);
+					if(ImGui.ImageButton("Lock Off", _imguiManager.ImageLoader.LockedInspectorIconId, new Num.Vector2(iconSize, iconSize)))
+					{
+						_imguiManager.IsInspectorTabLocked = false;
+						_lockedEntity = null;
+					}
+
+					if (ImGui.IsItemHovered())
+						ImGui.SetTooltip("Unlock the current inspector");
+				}
+				else
+				{
+					lockedButtonColor = ImGui.GetStyle().Colors[(int)ImGuiCol.Button];
+					ImGui.PushStyleColor(ImGuiCol.Button, lockedButtonColor);
+					if (ImGui.ImageButton("Lock On", _imguiManager.ImageLoader.UnlockedInspectorIconId, new Num.Vector2(iconSize, iconSize)))
+					{
+						_imguiManager.IsInspectorTabLocked = true;
+						_lockedEntity = Entity;
+					}
+
+					if (ImGui.IsItemHovered())
+						ImGui.SetTooltip("Lock the current inspector");
+				}
+
+				ImGui.PopStyleColor();
 				NezImGui.BigVerticalSpace();
 
 				if (Entity == null)
@@ -210,9 +239,11 @@ public class MainEntityInspector
 					if (Entity.Type == Entity.InstanceType.Prefab && !string.IsNullOrEmpty(Entity.OriginalPrefabName))
 					{
 						var originalPrefabName = Entity.OriginalPrefabName;
-						ImGui.InputText("Original Prefab Name", ref originalPrefabName, 50, ImGuiInputTextFlags.ReadOnly);
+						ImGui.InputText("Original Prefab Name", ref originalPrefabName, 50,
+							ImGuiInputTextFlags.ReadOnly);
 					}
 
+					#region Entity Basic Info
 					// Enabled
 					{
 						bool oldEnabled = Entity.Enabled;
@@ -248,8 +279,8 @@ public class MainEntityInspector
 						if (_isEditingName && ImGui.IsItemDeactivatedAfterEdit())
 						{
 							_isEditingName = false;
-							Entity.Name = name; 
-							
+							Entity.Name = name;
+
 							if (Entity.Name != _nameEditStartValue)
 							{
 								EditorChangeTracker.PushUndo(
@@ -369,13 +400,16 @@ public class MainEntityInspector
 						}
 					}
 
+
+					#endregion
+
 					NezImGui.MediumVerticalSpace();
 
-					if(_transformInspector != null)
+					if (_transformInspector != null)
 					{
 						_transformInspector.Draw();
 					}
-					
+
 					NezImGui.MediumVerticalSpace();
 
 					for (var i = _componentInspectors.Count - 1; i >= 0; i--)
@@ -404,7 +438,7 @@ public class MainEntityInspector
 							ShowApplyToPrefabCopiesConfirmation();
 						}
 					}
-					
+
 					if (Entity.Type == Entity.InstanceType.Prefab && !string.IsNullOrEmpty(Entity.OriginalPrefabName))
 					{
 						NezImGui.MediumVerticalSpace();
@@ -413,7 +447,7 @@ public class MainEntityInspector
 							_showApplyToOriginalPrefabConfirmation = true;
 						}
 					}
-					
+
 					DrawPrefabCreatorPopup();
 					DrawApplyToPrefabCopiesConfirmationPopup();
 					DrawApplyToOriginalPrefabConfirmationPopup();
@@ -868,7 +902,6 @@ public class MainEntityInspector
 		}
 	}
 
-	// Undo-enabled ApplyToOriginalPrefab
 	private async void ApplyToOriginalPrefabWithUndo()
 	{
 		// Save the current entity's data to its original prefab file
