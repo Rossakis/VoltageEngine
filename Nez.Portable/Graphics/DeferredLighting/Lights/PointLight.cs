@@ -15,6 +15,7 @@ namespace Nez.DeferredLighting
 			public float Radius;
 			public float Intensity;
 			public float ZPosition;
+			public bool DebugEnabled; 
 
 			public byte ColorR = 255;
 			public byte ColorG = 255;
@@ -44,6 +45,8 @@ namespace Nez.DeferredLighting
 				_data.Intensity = Intensity;
 				_data.Color = Color;
 				_data.ZPosition = ZPosition;
+				_data.DebugEnabled = DebugRenderEnabled;
+
 				return _data;
 			}
 			set
@@ -55,6 +58,8 @@ namespace Nez.DeferredLighting
 					Intensity = d.Intensity;
 					Color = d.Color;
 					ZPosition = d.ZPosition;
+					DebugRenderEnabled = d.DebugEnabled;
+
 					_data = d;
 				}
 			}
@@ -106,13 +111,6 @@ namespace Nez.DeferredLighting
 		}
 
 
-		public PointLight SetZPosition(float z)
-		{
-			ZPosition = z;
-			return this;
-		}
-
-
 		/// <summary>
 		/// how far does this light reach
 		/// </summary>
@@ -122,18 +120,6 @@ namespace Nez.DeferredLighting
 		{
 			_radius = radius;
 			_areBoundsDirty = true;
-			return this;
-		}
-
-
-		/// <summary>
-		/// brightness of the light
-		/// </summary>
-		/// <returns>The intensity.</returns>
-		/// <param name="intensity">Intensity.</param>
-		public PointLight SetIntensity(float intensity)
-		{
-			Intensity = intensity;
 			return this;
 		}
 

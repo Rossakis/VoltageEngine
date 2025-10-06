@@ -17,7 +17,8 @@ namespace Nez
 			public int PhysicsLayer;
 			public int CollidesWithLayers;
 			public bool ShouldColliderScaleAndRotateWithTransform;
-			public bool IsVisibleEvenDisabled; 
+			public bool IsVisibleEvenDisabled;
+			public bool DebugEnabled = true;
 
 			// BoxCollider
 			public RectangleF Rectangle; // Local rectangle (x, y, width, height)
@@ -40,6 +41,7 @@ namespace Nez
 				_data.CollidesWithLayers = CollidesWithLayers;
 				_data.ShouldColliderScaleAndRotateWithTransform = ShouldColliderScaleAndRotateWithTransform;
 				_data.IsVisibleEvenDisabled = IsVisibleEvenDisabled;
+				_data.DebugEnabled = DebugRenderEnabled;
 
 				if (this is BoxCollider box)
 				{
@@ -73,6 +75,7 @@ namespace Nez
 					CollidesWithLayers = colliderData.CollidesWithLayers;
 					ShouldColliderScaleAndRotateWithTransform = colliderData.ShouldColliderScaleAndRotateWithTransform;
 					IsVisibleEvenDisabled = colliderData.IsVisibleEvenDisabled;
+					DebugRenderEnabled = colliderData.DebugEnabled;
 
 					if (this is BoxCollider box)
 					{
@@ -157,6 +160,8 @@ namespace Nez
 		public bool ShouldColliderScaleAndRotateWithTransform = true;
 
 		public bool IsVisibleEvenDisabled;
+		public bool DebugRenderEnabled;
+
 		public virtual RectangleF Bounds
 		{
 			get

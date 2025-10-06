@@ -165,9 +165,11 @@ namespace Nez
 
 		public override void DebugRender(Batcher batcher)
 		{
+			if(!DebugRenderEnabled)
+				return;
+
 			var poly = Shape as Polygon;
 			batcher.DrawHollowRect(Bounds, Debug.Colors.ColliderBounds, Debug.Size.LineSizeMultiplier);
-
 
 			if(Enabled)
 				batcher.DrawPolygon(Shape.Position, poly.Points, Debug.Colors.ColliderEdge, true,
