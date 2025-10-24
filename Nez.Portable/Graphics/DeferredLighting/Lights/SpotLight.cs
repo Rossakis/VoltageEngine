@@ -11,7 +11,7 @@ namespace Nez.DeferredLighting
 			public float Radius;
 			public float Intensity;
 			public float ConeAngle;
-			public bool DebugEnabled;
+			public float ZPosition;
 
 			public byte ColorR = 255;
 			public byte ColorG = 255;
@@ -40,7 +40,7 @@ namespace Nez.DeferredLighting
 				_data.Radius = Radius;
 				_data.Intensity = Intensity;
 				_data.ConeAngle = ConeAngle;
-				_data.DebugEnabled = DebugRenderEnabled;
+				_data.ZPosition = ZPosition;
 				_data.Color = Color;
 
 				return _data;
@@ -53,6 +53,7 @@ namespace Nez.DeferredLighting
 					SetRadius(d.Radius);       
 					Intensity = d.Intensity;
 					ConeAngle = d.ConeAngle;
+					ZPosition = d.ZPosition;
 					Color = d.Color;
 
 					_data = d;
