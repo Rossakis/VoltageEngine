@@ -43,7 +43,8 @@ public class SceneGraphWindow
 	private const float RepeatRate = 0.08f; // seconds between repeats
 	public HashSet<Entity> ExpandedEntities = new();
 
-	// TiledMap (tmx) File Picker
+	// TiledMap (tmx) File Picker\
+	public bool ShowTmxFilePicker { get => _showTmxFilePicker; set => _showTmxFilePicker = value; }
 	private bool _showTmxFilePicker = false;
 	private string _selectedTmxFile = null;
 	public static event Action<string> OnTmxFileSelected;
@@ -170,12 +171,6 @@ public class SceneGraphWindow
 			{
 				_entityFilterName = "";
 				ImGui.OpenPopup("entity-selector");
-			}
-
-			NezImGui.MediumVerticalSpace();
-			if (NezImGui.CenteredButton("Load Tiled Map", 0.6f))
-			{
-				_showTmxFilePicker = true;
 			}
 
 			if (_showTmxFilePicker)

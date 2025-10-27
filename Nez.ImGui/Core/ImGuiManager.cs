@@ -12,6 +12,7 @@ using Nez.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Mime;
 using System.Threading.Tasks;
 using Nez.ImGuiTools.Inspectors;
 using Nez.ImGuiTools.Utils;
@@ -337,11 +338,36 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 			_mainMenuBarHeight = ImGui.GetWindowHeight();
 			if (ImGui.BeginMenu("File"))
 			{
+				if (ImGui.MenuItem("Save Scene", "Ctrl+S"))
+				{
+					InvokeSaveSceneChanges();
+				}
+
+				ImGui.Separator();
+
+				if (ImGui.MenuItem("Load Tiled Map"))
+				{
+					SceneGraphWindow.ShowTmxFilePicker = true;
+				}
+
+				if (ImGui.MenuItem("Load Aseprite Images"))
+				{
+					//TODO:
+				}
+
+				ImGui.Separator();
+
 				if (ImGui.MenuItem("Open Sprite Atlas Editor"))
 					_spriteAtlasEditorWindow = _spriteAtlasEditorWindow ?? new SpriteAtlasEditorWindow();
 
-				if (ImGui.MenuItem("Quit ImGui"))
+				if (ImGui.MenuItem("Close ImGui Editor"))
 					SetEnabled(false);
+
+				if (ImGui.MenuItem("Exit"))
+				{
+					Core.ConfirmAndExit();
+				}
+
 				ImGui.EndMenu();
 			}
 

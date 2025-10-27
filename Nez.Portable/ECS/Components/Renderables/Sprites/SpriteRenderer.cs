@@ -565,6 +565,9 @@ namespace Nez.Sprites
 				return;
 			}
 
+			// Store the saved origin BEFORE loading the sprite
+			var savedOrigin = _data.Origin;
+
 			switch (_data.FileType)
 			{
 				case SpriteRendererComponentData.ImageFileType.Png:
@@ -622,6 +625,13 @@ namespace Nez.Sprites
 				default:
 					Debug.Error($"Unknown or unsupported file type for: {_data.TextureFilePath}");
 					break;
+			}
+
+			// IMPORTANT: Restore the saved origin after loading
+			// This ensures manually set origins are preserved
+			if (savedOrigin != Vector2.Zero || _data.Origin != Vector2.Zero)
+			{
+				SetOrigin(savedOrigin);
 			}
 
 			// After loading the main image, load the normal map if specified
