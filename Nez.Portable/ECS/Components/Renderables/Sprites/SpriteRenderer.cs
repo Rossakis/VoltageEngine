@@ -627,7 +627,6 @@ namespace Nez.Sprites
 					break;
 			}
 
-			// IMPORTANT: Restore the saved origin after loading
 			// This ensures manually set origins are preserved
 			if (savedOrigin != Vector2.Zero || _data.Origin != Vector2.Zero)
 			{

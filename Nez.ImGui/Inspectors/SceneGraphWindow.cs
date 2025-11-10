@@ -1,15 +1,16 @@
 using ImGuiNET;
 using Microsoft.Xna.Framework.Input;
 using Nez.ECS;
+using Nez.Editor;
 using Nez.ImGuiTools.SceneGraphPanes;
 using Nez.ImGuiTools.UndoActions;
+using Nez.ImGuiTools.Utils;
 using Nez.Utils;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Nez.Editor;
 using Num = System.Numerics;
 
 namespace Nez.ImGuiTools;
@@ -46,7 +47,6 @@ public class SceneGraphWindow
 	// TiledMap (tmx) File Picker\
 	public bool ShowTmxFilePicker { get => _showTmxFilePicker; set => _showTmxFilePicker = value; }
 	private bool _showTmxFilePicker = false;
-	private string _selectedTmxFile = null;
 	public static event Action<string> OnTmxFileSelected;
 
 	// Prefab caching
@@ -69,6 +69,9 @@ public class SceneGraphWindow
 	/// </summary>
 	public void RefreshPrefabCache()
 	{
+		if(_prefabCacheInitialized)
+			return;
+
 		_cachedPrefabNames.Clear();
 		
 		var prefabsDirectory = "Content/Data/Prefabs";
@@ -223,11 +226,7 @@ public class SceneGraphWindow
 			ImGui.InputText("###EntityFilter", ref _entityFilterName, 25);
 			ImGui.Separator();
 
-			// Initialize prefab cache if not done yet
-			if (!_prefabCacheInitialized)
-			{
-				RefreshPrefabCache();
-			}
+			RefreshPrefabCache();
 
 			// Draw Entity Factory Types
 			ImGui.TextColored(new Num.Vector4(0.8f, 0.8f, 1.0f, 1.0f), "Entity Types:");
@@ -244,7 +243,6 @@ public class SceneGraphWindow
 				}
 			}
 
-			// Draw Prefabs (if any exist)
 			if (_cachedPrefabNames.Count > 0)
 			{
 				ImGui.Separator();
@@ -406,6 +404,31 @@ public class SceneGraphWindow
 		_cachedPrefabNames.Remove(prefabName);
 	}
 
+	#region Menu toolbar buttons
+	/// <summary>
+	/// Draws the Aseprite file picker popup similar to TMX file picker
+	/// </summary>
+	private void DrawAsepriteFilePickerPopup()
+	{
+		bool isOpen = true;
+		if (_asepriteFilePicker != null && _asepriteFilePicker.IsOpen)
+		{
+			var selection = _asepriteFilePicker.Draw();
+
+			if (selection != null)
+			{
+				// Handle the loaded Aseprite data
+				HandleAsepriteSelection(selection);
+				_asepriteFilePicker.Close();
+			}
+			else if (!_asepriteFilePicker.IsOpen)
+			{
+				// User closed the picker without selecting
+				_asepriteFilePicker.Close();
+			}
+		}
+	}
+
 	private void DrawTmxFilePickerPopup()
 	{
 		bool isOpen = true;
@@ -424,7 +447,8 @@ public class SceneGraphWindow
 					if (fullPath.StartsWith(contentRoot, StringComparison.OrdinalIgnoreCase))
 					{
 						string relativePath = "Content" + fullPath.Substring(contentRoot.Length).Replace('\\', '/');
-						HandleTmxFileSelected(relativePath);
+						OnTmxFileSelected?.Invoke(relativePath);
+
 						ImGui.CloseCurrentPopup();
 					}
 					else
@@ -441,12 +465,7 @@ public class SceneGraphWindow
 			ImGui.EndPopup();
 		}
 	}
-
-	private void HandleTmxFileSelected(string relativePath)
-	{
-		_selectedTmxFile = relativePath;
-		OnTmxFileSelected?.Invoke(relativePath);
-	}
+	#endregion
 
 	/// <summary>
 	/// Creates a new entity from a prefab.
