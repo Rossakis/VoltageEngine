@@ -23,9 +23,11 @@ namespace Nez.ImGuiTools.Utils
             public List<string> LayerNames { get; set; }
             public List<int> FrameNumbers { get; set; }
             public List<Sprite> Sprites { get; set; }
+            public bool ShowHiddenLayers;
+            public bool IsLayerMergeOn;
         }
 
-        private readonly object _owner;
+		private readonly object _owner;
         private readonly string _popupId;
         private readonly string _startingPath;
         private readonly bool _isAnimation;
@@ -35,6 +37,7 @@ namespace Nez.ImGuiTools.Utils
         private List<string> _availableLayers = new List<string>();
         private int _totalFrames = 0;
         private string _lastLoadedFile = null;
+        private bool _isFileSelected;
         private List<int> _selectedFrames = new List<int>();
         private List<string> _selectedLayers = new List<string>();
         private bool _isOpen = false;
@@ -44,7 +47,7 @@ namespace Nez.ImGuiTools.Utils
         private int _frameInputEnd = 0;
         private string _layerSearchFilter = "";
         private PersistentBool _isLayerMergeOn;
-
+        private PersistentBool _showHiddenLayers;
 		public string PopupId => _popupId;
         public bool IsOpen => _isOpen;
 
@@ -59,7 +62,8 @@ namespace Nez.ImGuiTools.Utils
             _owner = owner ?? throw new ArgumentNullException(nameof(owner));
             _popupId = popupId ?? throw new ArgumentNullException(nameof(popupId));
             _startingPath = startingPath ?? Path.Combine(Environment.CurrentDirectory, "Content");
-			_isLayerMergeOn = new($"{PopupId}_", false);
+			_isLayerMergeOn = new($"{PopupId}_IsLayerMergeOn", false);
+			_showHiddenLayers = new($"{PopupId}_ShowHiddenLayers", false);
 			_isAnimation = isAnimation;
         }
 
@@ -79,96 +83,108 @@ namespace Nez.ImGuiTools.Utils
             AsepriteSelection result = null;
             bool isOpen = _isOpen;
 
-			if (ImGui.BeginPopupModal(_popupId, ref isOpen))
-			{
-			    var picker = FilePicker.GetFilePicker(_owner, _startingPath, ".aseprite");
-			    picker.DontAllowTraverselBeyondRootFolder = true;
-			
-			    ImGui.Text("Aseprite File Selection:");
-			    ImGui.Separator();
-			
-			    // File picker section
-			    if (picker.Draw())
-			    {
-			        // Load metadata when a new file is selected
-			        if (!string.IsNullOrEmpty(picker.SelectedFile) && 
-			            picker.SelectedFile != _lastLoadedFile && 
-			            picker.SelectedFile.EndsWith(".aseprite"))
-			        {
-			            LoadAsepriteMetadata(picker.SelectedFile);
-			            _lastLoadedFile = picker.SelectedFile;
-			        }
-			        
-			        ImGui.EndChild();
-			    }
-			
-			    ImGui.Spacing();
+            if (ImGui.BeginPopupModal(_popupId, ref isOpen))
+            {
+                var picker = FilePicker.GetFilePicker(_owner, _startingPath, ".aseprite");
+                picker.DontAllowTraverselBeyondRootFolder = true;
 
-				bool layerMergeOn = _isLayerMergeOn.Value;
-			    if (ImGui.Checkbox("Merge Layers?", ref layerMergeOn))
-				    _isLayerMergeOn.Value = layerMergeOn;
+                ImGui.Text("Aseprite File Selection:");
+                ImGui.Separator();
 
-			    if(ImGui.IsItemHovered())
-			    {
-				    ImGui.SetTooltip("If FALSE, then for each selected layer, a SpriteEntity will be created.\n " +
-				                     "If TRUE, all visible layers will be merged into a single SpriteEntity.");
-				}
+                if (picker.Draw())
+                {
+                    if (!string.IsNullOrEmpty(picker.SelectedFile) && 
+                        picker.SelectedFile != _lastLoadedFile && 
+                        picker.SelectedFile.EndsWith(".aseprite"))
+                    {
+                        LoadAsepriteMetadata(picker.SelectedFile);
+                        _lastLoadedFile = picker.SelectedFile;
+                    }
+                    
+                    ImGui.EndChild();
+                }
 
-				if (_availableLayers.Count > 0)
-			    {
-			        if (ImGui.BeginChild("selection-section", new Num.Vector2(800, 300), true))
-			        {
-			            DrawLayerSelection();
-			            ImGui.Separator();
+                ImGui.Spacing();
 
-			            if (_isAnimation)
-				            DrawFrameSelection();
+                bool layerMergeOn = _isLayerMergeOn.Value;
+                if (ImGui.Checkbox("Merge Layers", ref layerMergeOn))
+                    _isLayerMergeOn.Value = layerMergeOn;
 
-			            ImGui.EndChild();
-					}
-				}
-			    
-			    ImGui.Separator();
-			
-			    bool shouldLoad = DrawActionButtons(picker);
-			
-			    if (shouldLoad)
-			    {
-			        string contentRoot = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, "Content"));
-			        if (picker.SelectedFile.StartsWith(contentRoot, StringComparison.OrdinalIgnoreCase))
-			        {
-			            string relativePath = Path.GetRelativePath(Environment.CurrentDirectory, picker.SelectedFile).Replace('\\', '/');
-			            
-			            result = new AsepriteSelection
-			            {
-			                FilePath = relativePath,
-			                LayerNames = _selectedLayers.Count > 0 ? new List<string>(_selectedLayers) : null,
-			                FrameNumbers = _selectedFrames.Count > 0 ? new List<int>(_selectedFrames) : new List<int> { 0 },
-			                Sprites = GenerateSprites(relativePath)
-			            };
-			
-			            ImGui.CloseCurrentPopup();
-			            FilePicker.RemoveFilePicker(picker);
-			            _isOpen = false;
-			            Reset();
-			        }
-			        else
-			        {
-			            NotificationSystem.ShowTimedNotification("File must be in Content folder!");
-			        }
-			    }
-			
-			    ImGui.EndPopup();
-			}
-			
-			if (!isOpen)
-			{
-			    FilePicker.RemoveFilePicker(_owner);
-			    _isOpen = false;
-			    Reset();
-			}
+                if (ImGui.IsItemHovered())
+                {
+                    ImGui.SetTooltip("If FALSE, then for each selected layer, a SpriteEntity will be created.\n " +
+                                     "If TRUE, all visible layers will be merged into a single SpriteEntity.");
+                }
 
-			return result;
+                bool showHiddenLayers = _showHiddenLayers.Value;
+                if (ImGui.Checkbox("Load Hidden Layers", ref showHiddenLayers))
+                {
+                    _showHiddenLayers.Value = showHiddenLayers;
+                    
+                    // Reload metadata when checkbox changes to update available layers
+                    if (_isFileSelected && !string.IsNullOrEmpty(_lastLoadedFile))
+                    {
+                        LoadAsepriteMetadata(_lastLoadedFile);
+                    }
+                }
+
+                if (_availableLayers.Count > 0)
+                {
+                    if (ImGui.BeginChild("selection-section", new Num.Vector2(800, 300), true))
+                    {
+                        DrawLayerSelection();
+                        ImGui.Separator();
+
+                        if (_isAnimation)
+                            DrawFrameSelection();
+
+                        ImGui.EndChild();
+                    }
+                }
+                
+                ImGui.Separator();
+
+                bool shouldLoad = DrawActionButtons(picker, ref _isOpen);
+
+                if (shouldLoad)
+                {
+                    string contentRoot = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, "Content"));
+                    if (picker.SelectedFile.StartsWith(contentRoot, StringComparison.OrdinalIgnoreCase))
+                    {
+                        string relativePath = Path.GetRelativePath(Environment.CurrentDirectory, picker.SelectedFile).Replace('\\', '/');
+                        
+                        result = new AsepriteSelection
+                        {
+                            FilePath = relativePath,
+                            LayerNames = _selectedLayers.Count > 0 ? new List<string>(_selectedLayers) : null,
+                            FrameNumbers = _selectedFrames.Count > 0 ? new List<int>(_selectedFrames) : new List<int> { 0 },
+                            Sprites = GenerateSprites(relativePath),
+                            IsLayerMergeOn = _isLayerMergeOn.Value,
+                            ShowHiddenLayers = _showHiddenLayers.Value
+                        };
+
+                        ImGui.CloseCurrentPopup();
+                        FilePicker.RemoveFilePicker(picker);
+                        _isOpen = false;
+                        Reset();
+                    }
+                    else
+                    {
+                        NotificationSystem.ShowTimedNotification("File must be in Content folder!");
+                    }
+                }
+
+	            ImGui.EndPopup();
+            }
+            
+            if (!isOpen)
+            {
+                FilePicker.RemoveFilePicker(_owner);
+                _isOpen = false;
+                Reset();
+            }
+
+            return result;
         }
 
         private void LoadAsepriteMetadata(string filePath)
@@ -187,7 +203,10 @@ namespace Nez.ImGuiTools.Utils
                     {
                         if (!string.IsNullOrEmpty(layer.Name))
                         {
-                            _availableLayers.Add(layer.Name);
+                            if (_showHiddenLayers.Value || layer.IsVisible)
+                            {
+                                _availableLayers.Add(layer.Name);
+                            }
                         }
                     }
                 }
@@ -196,12 +215,14 @@ namespace Nez.ImGuiTools.Utils
                 _selectedFrames.Clear();
                 _frameInputStart = 0;
                 _frameInputEnd = Math.Max(0, _totalFrames - 1);
+                _isFileSelected = true; 
             }
             catch (Exception ex)
             {
                 NotificationSystem.ShowTimedNotification($"Error loading Aseprite file: {ex.Message}");
                 _availableLayers.Clear();
                 _totalFrames = 0;
+                _isFileSelected = false; 
             }
         }
 
@@ -222,7 +243,7 @@ namespace Nez.ImGuiTools.Utils
 
                 foreach (var layer in filteredLayers)
                 {
-                    bool isSelected = _selectedLayers.Contains(layer);
+	                bool isSelected = _selectedLayers.Contains(layer);
                     if (ImGui.Selectable(layer, isSelected))
                     {
                         if (isSelected)
@@ -296,7 +317,7 @@ namespace Nez.ImGuiTools.Utils
 
             ImGui.Spacing();
             
-            if (_selectedFrames.Count > 0) // Display selected frames
+            if (_selectedFrames.Count > 0) 
             {
                 ImGui.TextColored(new Num.Vector4(0.7f, 1.0f, 0.7f, 1.0f), 
                     $"Selected frames ({_selectedFrames.Count}): {string.Join(", ", _selectedFrames)}");
@@ -381,7 +402,7 @@ namespace Nez.ImGuiTools.Utils
             return sprites;
         }
 
-        private bool DrawActionButtons(FilePicker picker)
+        private bool DrawActionButtons(FilePicker picker, ref bool openPopup)
         {
             bool shouldLoad = false;
 
@@ -389,11 +410,14 @@ namespace Nez.ImGuiTools.Utils
             float totalWidth = ImGui.GetContentRegionAvail().X;
             float rightButtonStart = totalWidth - buttonWidth;
 
-            if (ImGui.Button("Cancel", new Num.Vector2(buttonWidth, 0)))
+            if (_isFileSelected)
             {
-                Close();
+                if (ImGui.Button("Cancel", new Num.Vector2(buttonWidth, 0)))
+                {
+                    openPopup = false;
+                }
             }
-
+            
             ImGui.SameLine(rightButtonStart);
 
             bool canConfirm = !string.IsNullOrEmpty(picker.SelectedFile) && 
@@ -408,7 +432,7 @@ namespace Nez.ImGuiTools.Utils
             if (ImGui.Button("Load", new Num.Vector2(buttonWidth, 0)) && canConfirm)
             {
                 shouldLoad = true;
-			}
+            }
 
             if (!canConfirm)
             {
@@ -426,26 +450,12 @@ namespace Nez.ImGuiTools.Utils
             _selectedFrames.Clear();
             _selectedLayers.Clear();
             _availableLayers.Clear();
-            _totalFrames = 0;
+            _isFileSelected = false;
+			_totalFrames = 0;
             _lastLoadedFile = null;
             _frameInputStart = 0;
             _frameInputEnd = 0;
             _layerSearchFilter = "";
         }
-
-        /// <summary>
-        /// Closes the file picker if it's open.
-        /// </summary>
-        public void Close()
-        {
-            if (_isOpen)
-            {
-                ImGui.CloseCurrentPopup();
-                FilePicker.RemoveFilePicker(_owner);
-                _isOpen = false;
-                Reset();
-                Debug.Log(IsOpen);
-			}
-		}
     }
 }
