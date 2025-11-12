@@ -34,9 +34,7 @@ namespace Nez
 		{
 			_points = new List<Vector2>();
 
-			// first and last point must not be the same. we want an open polygon
 			var isPolygonClosed = points[0] == points[points.Length - 1];
-
 			if (isPolygonClosed)
 				Array.Resize(ref points, points.Length - 1);
 
@@ -44,6 +42,7 @@ namespace Nez
 			SetLocalOffset(center);
 			Polygon.RecenterPolygonVerts(points);
 			Shape = new Polygon(points);
+			
 			_points.AddRange(points);
 		}
 
