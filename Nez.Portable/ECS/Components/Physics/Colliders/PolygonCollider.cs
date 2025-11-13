@@ -74,13 +74,46 @@ namespace Nez
 
 			try
 			{
+				// Create shape directly from current points WITHOUT recentering
+				var pointsArray = _points.ToArray();
+				Shape = new Polygon(pointsArray);
+				
+				// Don't update _points or LocalOffset - keep them as-is
+				// This preserves the barycentric center position
+				
+				if (Entity != null && Enabled)
+				{
+					_isPositionDirty = true;
+					_isRotationDirty = true;
+					Physics.UpdateCollider(this);
+				}
+			}
+			catch (Exception ex)
+			{
+				Debug.Error($"Failed to update polygon shape: {ex.Message}");
+			}
+		}
+
+		/// <summary>
+		/// Updates shape WITH recentering - recalculates barycentric center and adjusts all points.
+		/// Use this when you want to normalize the polygon or when loading from Tiled.
+		/// </summary>
+		public void UpdateShapeFromPointsWithRecentering()
+		{
+			if (_points == null || _points.Count < 3)
+			{
+				Debug.Warn("PolygonCollider requires at least 3 points");
+				return;
+			}
+
+			try
+			{
 				var pointsArray = _points.ToArray();
 				var center = Polygon.FindPolygonCenter(pointsArray);
 				SetLocalOffset(center);
 				Polygon.RecenterPolygonVerts(pointsArray);
 				Shape = new Polygon(pointsArray);
 				
-				// Update the list with recentered points
 				_points.Clear();
 				_points.AddRange(pointsArray);
 				
@@ -109,13 +142,6 @@ namespace Nez
 			{
 				batcher.DrawPolygon(Shape.Position, poly.Points, Debug.Colors.ColliderEdge, true,
 					Debug.Size.LineSizeMultiplier);
-				
-				// Draw points as circles for easier editing
-				for (int i = 0; i < poly.Points.Length; i++)
-				{
-					var worldPoint = Shape.Position + poly.Points[i];
-					batcher.DrawCircle(worldPoint, 3f * Debug.Size.LineSizeMultiplier, Color.Yellow, 2f);
-				}
 			}
 			else if (!Enabled && IsVisibleEvenDisabled)
 			{
@@ -142,7 +168,7 @@ namespace Nez
 					IsVisibleEvenDisabled = IsVisibleEvenDisabled,
 					DebugEnabled = DebugRenderEnabled,
 					LocalOffset = LocalOffset,
-					PolygonPoints = Shape is Polygon poly ? poly.Points.ToList() : new List<Vector2>()
+					PolygonPoints = _points != null ? new List<Vector2>(_points) : new List<Vector2>()
 				};
 
 				return polygonData;
@@ -169,7 +195,7 @@ namespace Nez
 					{
 						_points = new List<Vector2>(colliderData.PolygonPoints);
 						
-						// Reconstruct the shape
+						// When loading, use recentering to normalize the polygon
 						var pointsArray = _points.ToArray();
 						var center = Polygon.FindPolygonCenter(pointsArray);
 						SetLocalOffset(center);

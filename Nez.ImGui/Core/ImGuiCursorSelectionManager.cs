@@ -10,6 +10,7 @@ using Nez.Utils;
 using System.Collections.Generic;
 using System.Linq;
 using Nez.ImGuiTools.UndoActions;
+using Nez.PhysicsShapes;
 
 namespace Nez.ImGuiTools
 {
@@ -17,7 +18,8 @@ namespace Nez.ImGuiTools
 	{
 		Normal,
 		Resize,
-		Rotate
+		Rotate,
+		ColliderResize
 	}
 
 	/// <summary>
@@ -58,7 +60,13 @@ namespace Nez.ImGuiTools
 		private Dictionary<Entity, Vector2> _dragStartEntityPositions = new();
 		private Dictionary<Entity, Vector2> _dragEndEntityPositions = new();
 
-		// Gizmo hover state
+		// Collider resize state
+		private bool _isDraggingColliderPoint = false;
+		private PolygonCollider _selectedPolygonCollider;
+		private int _selectedPointIndex = -1;
+		private Vector2 _originalPointValue;
+		private Dictionary<PolygonCollider, List<Vector2>> _originalPolygonPoints = new();
+
 		public bool IsMouseOverGizmo { get; private set; }
 
 		public ImGuiCursorSelectionManager(ImGuiManager imGuiManager)
@@ -77,6 +85,8 @@ namespace Nez.ImGuiTools
 				SelectionMode = CursorSelectionMode.Resize;
 			else if (ImGui.IsKeyPressed(ImGuiKey._3) || ImGui.IsKeyPressed(ImGuiKey.R))
 				SelectionMode = CursorSelectionMode.Rotate;
+			else if (ImGui.IsKeyPressed(ImGuiKey._4) || ImGui.IsKeyPressed(ImGuiKey.T))
+				SelectionMode = CursorSelectionMode.ColliderResize;
 
 			UpdateModifierKeys();
 
@@ -88,13 +98,14 @@ namespace Nez.ImGuiTools
 					DrawEntityScaleGizmo();
 				else if (SelectionMode == CursorSelectionMode.Rotate)
 					DrawEntityRotateGizmo();
+				else if (SelectionMode == CursorSelectionMode.ColliderResize)
+					DrawColliderResizeGizmo();
 
-				if (!IsMouseOverGizmo && Core.IsEditMode)
-					HandleBoxSelection(); // Don't make the box selection if the mouse is over the gizmo or in Play Mode
+				if (!IsMouseOverGizmo && Core.IsEditMode && !_isDraggingColliderPoint)
+					HandleBoxSelection();
 
 				if (Input.DoubleLeftMouseButtonPressed)
 				{
-					// Only clear selection if no modifier is pressed
 					if (!_ctrlDown && !_shiftDown)
 						DeselectEntity();
 
@@ -102,7 +113,7 @@ namespace Nez.ImGuiTools
 					_isBoxSelecting = false;
 				}
 				else if (Input.LeftMouseButtonPressed && !_draggingX && !_draggingY && !IsMouseOverGizmo &&
-				         !_ctrlDown && !_shiftDown)
+				         !_ctrlDown && !_shiftDown && !_isDraggingColliderPoint)
 				{
 					DeselectEntity();
 				}
@@ -133,7 +144,6 @@ namespace Nez.ImGuiTools
 
 			if (!_isBoxSelecting && Input.LeftMouseButtonPressed)
 			{
-				// Only clear previous selection if no modifier is pressed
 				if (!_ctrlDown && !_shiftDown)
 				{
 					_imGuiManager.SceneGraphWindow.EntityPane.DeselectAllEntities();
@@ -223,7 +233,6 @@ namespace Nez.ImGuiTools
 			if (selectedEntities.Count > 0)
 			{
 				var entityPane = _imGuiManager.SceneGraphWindow.EntityPane;
-				// Only clear selection if no modifier is held
 				bool additive = _ctrlDown || _shiftDown;
 				if (!additive)
 					entityPane.DeselectAllEntities();
@@ -255,64 +264,6 @@ namespace Nez.ImGuiTools
 			return new RectangleF(pos.X - 8, pos.Y - 8, 16, 16);
 		}
 
-		private void TrySelectEntityAtMouse()
-		{
-			var mouseWorld = Core.Scene.Camera.ScreenToWorldPoint(Input.ScaledMousePosition);
-			Entity selected = null;
-
-			for (int i = Core.Scene.Entities.Count - 1; i >= 0; i--)
-			{
-				var entity = Core.Scene.Entities[i];
-				var collider = entity.GetComponent<Collider>();
-				if (collider != null && collider.Bounds.Contains(mouseWorld))
-				{
-					selected = entity;
-					break;
-				}
-			}
-
-			if (selected == null)
-			{
-				float minDist = 16f;
-				for (int i = Core.Scene.Entities.Count - 1; i >= 0; i--)
-				{
-					var entity = Core.Scene.Entities[i];
-					var sprite = entity.GetComponent<SpriteRenderer>();
-					if (sprite != null)
-					{
-						if (!sprite.IsSelectableInEditor)
-							continue;
-
-						var bounds = sprite.Bounds;
-						if (bounds.Contains(mouseWorld))
-						{
-							selected = entity;
-							break;
-						}
-					}
-					else
-					{
-						float dist = Vector2.Distance(entity.Transform.Position, mouseWorld);
-						if (dist < minDist)
-						{
-							selected = entity;
-							minDist = dist;
-						}
-					}
-				}
-			}
-
-			if (selected != null)
-			{
-				// Treat Shift as Control for game window selection
-				bool additive = _ctrlDown || _shiftDown;
-				_imGuiManager.SceneGraphWindow.EntityPane.SetSelectedEntity(selected, additive, false);
-
-				_imGuiManager.OpenMainEntityInspector(selected);
-				SetCameraTargetPosition(selected.Transform.Position);
-			}
-		}
-
 		public void DeselectEntity()
 		{
 			_imGuiManager.SceneGraphWindow.EntityPane.DeselectAllEntities();
@@ -323,7 +274,156 @@ namespace Nez.ImGuiTools
 
 		public void SetCameraTargetPosition(Vector2 position)
 		{
+			// Validate position before setting camera target
+			if (MathUtils.IsVectorNaNOrInfinite(position))
+			{
+				Debug.Warn($"Attempted to set camera target to invalid position: {position}. Ignoring.");
+				return;
+			}
+			
 			_imGuiManager.CameraTargetPosition = _imGuiManager.SceneGraphWindow.EntityPane.GetSelectedEntitiesCenter();
+		}
+
+		private void TrySelectEntityAtMouse()
+		{
+			var mouseWorld = Core.Scene.Camera.ScreenToWorldPoint(Input.ScaledMousePosition);
+			Entity selected = null;
+
+			// Priority 1= Entities with Colliders (highest)
+			Entity closestColliderEntity = null;
+			float closestColliderDistance = float.MaxValue;
+
+			for (int i = Core.Scene.Entities.Count - 1; i >= 0; i--)
+			{
+				var entity = Core.Scene.Entities[i];
+				
+				if (MathUtils.IsVectorNaNOrInfinite(entity.Transform.Position))
+				{
+					Debug.Warn($"Entity '{entity.Name}' has invalid position: {entity.Transform.Position}. Skipping selection.");
+					continue;
+				}
+				
+				var collider = entity.GetComponent<Collider>();
+				if (collider != null && collider.Bounds.Contains(mouseWorld))
+				{
+					var colliderCenter = new Vector2(
+						collider.Bounds.X + collider.Bounds.Width * 0.5f,
+						collider.Bounds.Y + collider.Bounds.Height * 0.5f
+					);
+					float distance = Vector2.Distance(mouseWorld, colliderCenter);
+					
+					if (distance < closestColliderDistance)
+					{
+						closestColliderDistance = distance;
+						closestColliderEntity = entity;
+					}
+				}
+			}
+
+			if (closestColliderEntity != null)
+			{
+				selected = closestColliderEntity;
+			}
+			else
+			{
+				// Priority 2 = Entities with SpriteRenderer
+				Entity lowestRenderLayerSprite = null;
+				int lowestRenderLayer = int.MaxValue;
+				float minDist = 16f;
+
+				for (int i = Core.Scene.Entities.Count - 1; i >= 0; i--)
+				{
+					var entity = Core.Scene.Entities[i];
+					
+					// Skip entities with invalid positions
+					if (MathUtils.IsVectorNaNOrInfinite(entity.Transform.Position))
+					{
+						continue;
+					}
+					
+					var sprite = entity.GetComponent<SpriteRenderer>();
+					if (sprite != null)
+					{
+						if (!sprite.IsSelectableInEditor)
+							continue;
+
+						var bounds = sprite.Bounds;
+						if (bounds.Contains(mouseWorld))
+						{
+							// Check if this sprite has a lower render layer (renders on top)
+							// Lower value = renders later = appears in front
+							if (sprite.RenderLayer < lowestRenderLayer)
+							{
+								lowestRenderLayer = sprite.RenderLayer;
+								lowestRenderLayerSprite = entity;
+							}
+							else if (sprite.RenderLayer == lowestRenderLayer)
+							{
+								// If render layers are equal, prefer the closer one
+								if (lowestRenderLayerSprite != null)
+								{
+									float currentDist = Vector2.Distance(entity.Transform.Position, mouseWorld);
+									float existingDist = Vector2.Distance(lowestRenderLayerSprite.Transform.Position, mouseWorld);
+									
+									if (currentDist < existingDist)
+									{
+										lowestRenderLayerSprite = entity;
+									}
+								}
+								else
+								{
+									lowestRenderLayerSprite = entity;
+								}
+							}
+						}
+					}
+				}
+
+				selected = lowestRenderLayerSprite;
+
+				// Priority 3 = Fallback to entities without sprites/colliders
+				if (selected == null)
+				{
+					float minDistFallback = 16f;
+					for (int i = Core.Scene.Entities.Count - 1; i >= 0; i--)
+					{
+						var entity = Core.Scene.Entities[i];
+						
+						if (MathUtils.IsVectorNaNOrInfinite(entity.Transform.Position))
+						{
+							continue;
+						}
+						
+						if (entity.GetComponent<SpriteRenderer>() == null && 
+						    entity.GetComponent<Collider>() == null)
+						{
+							float dist = Vector2.Distance(entity.Transform.Position, mouseWorld);
+							if (dist < minDistFallback)
+							{
+								selected = entity;
+								minDistFallback = dist;
+							}
+						}
+					}
+				}
+			}
+
+			if (selected != null)
+			{
+				// Treat Shift as Control for game window selection
+				bool additive = _ctrlDown || _shiftDown;
+
+				_imGuiManager.SceneGraphWindow.EntityPane.SetSelectedEntity(selected, additive, false);
+				_imGuiManager.OpenMainEntityInspector(selected);
+
+				if (MathUtils.IsVectorNaNOrInfinite(selected.Transform.Position))
+				{
+					Debug.Error($"Selected entity '{selected.Name}' has invalid position. Not setting camera target.");
+					return;
+				}
+				
+				SetCameraTargetPosition(selected.Transform.Position);
+			}
 		}
 
 		/// <summary>
@@ -337,10 +437,31 @@ namespace Nez.ImGuiTools
 			if (entityPane.SelectedEntities.Count == 0 || !Core.IsEditMode)
 				return;
 
+			// Calculate center, skipping entities with invalid positions
 			Vector2 center = Vector2.Zero;
+			int validEntityCount = 0;
+			
 			foreach (var e in entityPane.SelectedEntities)
+			{
+				// Skip entities with NaN or Infinity positions
+				if (MathUtils.IsVectorNaNOrInfinite(e.Transform.Position))
+				{
+					Debug.Warn($"Entity '{e.Name}' has invalid position: {e.Transform.Position}. Skipping from gizmo center calculation.");
+					continue;
+				}
+				
 				center += e.Transform.Position;
-			center /= entityPane.SelectedEntities.Count;
+				validEntityCount++;
+			}
+			
+			// If no valid entities, don't draw gizmo
+			if (validEntityCount == 0)
+			{
+				Debug.Warn("No valid entities to draw gizmo for.");
+				return;
+			}
+			
+			center /= validEntityCount;
 
 			var camera = Core.Scene.Camera;
 			float baseLength = 30f;
@@ -400,11 +521,25 @@ namespace Nez.ImGuiTools
 			var mousePos = Input.ScaledMousePosition;
 			var worldMouse = camera.ScreenToWorldPoint(mousePos);
 
-			// Compute gizmo axis positions
+			// Compute gizmo axis positions (skip invalid entities)
 			Vector2 center = Vector2.Zero;
+			int validEntityCount = 0;
+			
 			foreach (var e in selectedEntities)
+			{
+				if (MathUtils.IsVectorNaNOrInfinite(e.Transform.Position))
+				{
+					continue;
+				}
+				
 				center += e.Transform.Position;
-			center /= selectedEntities.Count;
+				validEntityCount++;
+			}
+			
+			if (validEntityCount == 0)
+				return;
+		
+			center /= validEntityCount;
 
 			float baseLength = 30f;
 			float minLength = 10f;
@@ -442,7 +577,15 @@ namespace Nez.ImGuiTools
 
 					_dragStartEntityPositions.Clear();
 					foreach (var entity in selectedEntities)
+					{
+						// Skip entities with invalid positions
+						if (MathUtils.IsVectorNaNOrInfinite(entity.Transform.Position))
+						{
+							continue;
+						}
+						
 						_dragStartEntityPositions[entity] = entity.Transform.Position;
+					}
 
 					_dragStartWorldMouse = camera.ScreenToWorldPoint(mousePos);
 				}
@@ -454,6 +597,12 @@ namespace Nez.ImGuiTools
 				var delta = worldMouse - _dragStartWorldMouse;
 				foreach (var entity in selectedEntities)
 				{
+					// Skip entities with invalid positions
+					if (MathUtils.IsVectorNaNOrInfinite(entity.Transform.Position))
+					{
+						continue;
+					}
+					
 					var startPos = _dragStartEntityPositions.TryGetValue(entity, out var pos)
 						? pos
 						: entity.Transform.Position;
@@ -483,7 +632,15 @@ namespace Nez.ImGuiTools
 
 				_dragEndEntityPositions = new Dictionary<Entity, Vector2>();
 				foreach (var entity in selectedEntities)
+				{
+					// Skip entities with invalid positions
+					if (MathUtils.IsVectorNaNOrInfinite(entity.Transform.Position))
+					{
+						continue;
+					}
+					
 					_dragEndEntityPositions[entity] = entity.Transform.Position;
+				}
 
 				// Only push undo if any entity moved
 				bool anyMoved = selectedEntities.Any(e =>
@@ -496,12 +653,12 @@ namespace Nez.ImGuiTools
 				{
 					EditorChangeTracker.PushUndo(
 						new MultiEntityTransformUndoAction(
-							selectedEntities.ToList(),
+							selectedEntities.Where(e => !MathUtils.IsVectorNaNOrInfinite(e.Transform.Position)).ToList(),
 							_dragStartEntityPositions,
 							_dragEndEntityPositions,
 							$"Moved {string.Join(", ", selectedEntities.Select(e => e.Name))}"
 						),
-						selectedEntities.First(),
+						selectedEntities.First(e => !MathUtils.IsVectorNaNOrInfinite(e.Transform.Position)),
 						$"Moved {string.Join(", ", selectedEntities.Select(e => e.Name))}"
 					);
 				}
@@ -813,9 +970,168 @@ namespace Nez.ImGuiTools
 			}
 		}
 
-		/// <summary>
-		/// Utility to check if mouse is near a line segment.
-		/// </summary>
+		private void DrawColliderResizeGizmo()
+		{
+			var entityPane = _imGuiManager.SceneGraphWindow.EntityPane;
+			IsMouseOverGizmo = false;
+
+			if (entityPane.SelectedEntities.Count == 0 || !Core.IsEditMode)
+				return;
+
+			var camera = Core.Scene.Camera;
+			var mousePos = Input.ScaledMousePosition;
+			var worldMouse = camera.ScreenToWorldPoint(mousePos);
+
+			// Collect all PolygonColliders from selected entities
+			var polygonColliders = new List<PolygonCollider>();
+			foreach (var entity in entityPane.SelectedEntities)
+			{
+				var colliders = entity.GetComponents<PolygonCollider>();
+				polygonColliders.AddRange(colliders);
+			}
+
+			if (polygonColliders.Count == 0)
+				return;
+
+			// Start dragging
+			if (!_isDraggingColliderPoint && Input.LeftMouseButtonPressed)
+			{
+				float minDist = 10f / camera.RawZoom;
+				PolygonCollider closestCollider = null;
+				int closestPointIndex = -1;
+				float closestDistance = float.MaxValue;
+
+				foreach (var collider in polygonColliders)
+				{
+					var polygon = collider.Shape as Polygon;
+					if (polygon == null || polygon.Points == null)
+						continue;
+
+					for (int i = 0; i < polygon.Points.Length; i++)
+					{
+						var worldPoint = collider.Entity.Transform.Position + collider.LocalOffset + polygon.Points[i];
+						float dist = Vector2.Distance(worldMouse, worldPoint);
+
+						if (dist < minDist && dist < closestDistance)
+						{
+							closestDistance = dist;
+							closestCollider = collider;
+							closestPointIndex = i;
+						}
+					}
+				}
+
+				if (closestCollider != null && closestPointIndex >= 0)
+				{
+					_isDraggingColliderPoint = true;
+					_selectedPolygonCollider = closestCollider;
+					_selectedPointIndex = closestPointIndex;
+					_originalPointValue = _selectedPolygonCollider.Points[_selectedPointIndex];
+
+					// Store original points for undo
+					_originalPolygonPoints.Clear();
+					foreach (var collider in polygonColliders)
+					{
+						_originalPolygonPoints[collider] = new List<Vector2>(collider.Points);
+					}
+				}
+			}
+
+			// During dragging
+			if (_isDraggingColliderPoint && Input.LeftMouseButtonDown)
+			{
+				if (_selectedPolygonCollider != null && _selectedPointIndex >= 0)
+				{
+					
+					// Get the world-space center of the collider
+					var worldCenter = _selectedPolygonCollider.Entity.Transform.Position + _selectedPolygonCollider.LocalOffset;
+					
+					// Calculate the new point position RELATIVE TO THE FIXED CENTER
+					var newLocalPoint = worldMouse - worldCenter;
+
+					// Directly update the point
+					_selectedPolygonCollider.Points[_selectedPointIndex] = newLocalPoint;
+					
+					// Update the shape WITHOUT recentering (keeps center fixed)
+					_selectedPolygonCollider.UpdateShapeFromPoints();
+
+					ImGui.SetMouseCursor(ImGuiMouseCursor.ResizeAll);
+					IsMouseOverGizmo = true;
+				}
+			}
+
+			// End dragging
+			if (_isDraggingColliderPoint && Input.LeftMouseButtonReleased)
+			{
+				if (_selectedPolygonCollider != null)
+				{
+					var finalPoints = new Dictionary<PolygonCollider, List<Vector2>>();
+					finalPoints[_selectedPolygonCollider] = new List<Vector2>(_selectedPolygonCollider.Points);
+
+					EditorChangeTracker.PushUndo(
+						new PolygonColliderPointEditUndoAction(
+							_selectedPolygonCollider,
+							_originalPolygonPoints[_selectedPolygonCollider],
+							finalPoints[_selectedPolygonCollider],
+							$"Edited PolygonCollider point on {_selectedPolygonCollider.Entity.Name}"
+						),
+						_selectedPolygonCollider.Entity,
+						$"Edited PolygonCollider point"
+					);
+				}
+
+				_isDraggingColliderPoint = false;
+				_selectedPolygonCollider = null;
+				_selectedPointIndex = -1;
+				_originalPolygonPoints.Clear();
+			}
+
+			// Draw all polygon points
+			float pointSize = 6f / camera.RawZoom;
+			foreach (var collider in polygonColliders)
+			{
+				var polygon = collider.Shape as Polygon;
+				if (polygon == null || polygon.Points == null)
+					continue;
+
+				for (int i = 0; i < polygon.Points.Length; i++)
+				{
+					var worldPoint = collider.Entity.Transform.Position + collider.LocalOffset + polygon.Points[i];
+					
+					bool isSelected = _isDraggingColliderPoint && 
+					                 collider == _selectedPolygonCollider && 
+					                 i == _selectedPointIndex;
+
+					var pointColor = isSelected ? Color.Yellow : Color.Cyan;
+					
+					// Draw point as small circle
+					Debug.DrawHollowRect(new RectangleF(
+						worldPoint.X - pointSize / 2f,
+						worldPoint.Y - pointSize / 2f,
+						pointSize,
+						pointSize
+					), pointColor);
+
+					// Draw lines between points
+					if (i < polygon.Points.Length - 1)
+					{
+						var nextWorldPoint = collider.Entity.Transform.Position + collider.LocalOffset + polygon.Points[i + 1];
+						Debug.DrawLine(worldPoint, nextWorldPoint, Color.Cyan * 0.5f);
+					}
+					else
+					{
+						// Connect last point to first
+						var firstWorldPoint = collider.Entity.Transform.Position + collider.LocalOffset + polygon.Points[0];
+						Debug.DrawLine(worldPoint, firstWorldPoint, Color.Cyan * 0.5f);
+					}
+				}
+				
+				// Draw center point for reference
+				var centerPoint = collider.Entity.Transform.Position + collider.LocalOffset;
+				Debug.DrawCircle(centerPoint, 4f / camera.RawZoom, Color.Red);
+			}
+		}
+
 		private bool IsMouseNearLine(Vector2 mouse, Vector2 a, Vector2 b, float threshold = 10f)
 		{
 			var ap = mouse - a;
