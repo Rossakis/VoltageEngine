@@ -4,6 +4,7 @@ using Nez.Systems;
 using Nez.Tiled;
 using Nez.Utils.Extensions;
 using System.Collections.Generic;
+using System.IO;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
 
@@ -251,7 +252,6 @@ namespace Nez
 			if (CollisionLayer == null || !_shouldCreateColliders)
 				return;
 
-			// fetch the collision layer and its rects for collision
 			var collisionRects = CollisionLayer.GetCollisionRectangles();
 
 			// create colliders for the rects we received
@@ -287,14 +287,14 @@ namespace Nez
 		{
 			if (string.IsNullOrEmpty(_data?.TiledMapPath))
 			{
-				Debug.Warn("TiledMapRenderer has no TiledMapPath to load from.");
+				Debug.Log(Debug.LogType.Warn, "TiledMapRenderer has no TiledMapPath to load from.");
 				return;
 			}
 
 			var contentManager = Entity?.Scene?.Content ?? Core.Content;
 			if (contentManager == null)
 			{
-				Debug.Warn($"No content manager available to load TMX file: {_data.TiledMapPath}");
+				Debug.Log(Debug.LogType.Warn, $"No content manager available to load TMX file: {_data.TiledMapPath}");
 				return;
 			}
 
@@ -313,7 +313,7 @@ namespace Nez
 			}
 			catch (Exception ex)
 			{
-				Debug.Error($"Failed to load TiledMap from {_data.TiledMapPath}: {ex.Message}");
+				Debug.Log(Debug.LogType.Error, $"Failed to load TiledMap from {_data.TiledMapPath}: {ex.Message}");
 			}
 		}
 	}
