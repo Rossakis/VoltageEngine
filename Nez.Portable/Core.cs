@@ -426,8 +426,6 @@ public class Core : Game
 		return sceneTransition;
 	}
 
-
-
 	#region Global Managers
 
 	/// <summary>
