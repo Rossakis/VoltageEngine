@@ -11,6 +11,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using Num = System.Numerics;
 
 namespace Nez.ImGuiTools;
@@ -37,6 +38,12 @@ public class MainEntityInspector
 	private ImGuiManager _imGuiManager;
 	private Entity _lockedEntity;
 
+	// Add Component fields
+	private bool _showAddComponentPopup = false;
+	private string _componentFilterText = "";
+	private List<Type> _availableComponentTypes;
+	private static List<Type> _cachedComponentTypes; // Cache to avoid repeated reflection
+
 	public MainEntityInspector(ImGuiManager manager, Entity entity = null)
 	{
 		_imGuiManager = manager;
@@ -48,19 +55,179 @@ public class MainEntityInspector
 		{
 			_transformInspector = new TransformInspector(Entity.Transform);
 			for (var i = 0; i < Entity.Components.Count; i++)
-				_componentInspectors.Add(ComponentInspectorFactory.CreateInspector(Entity.Components[i])); // Use factory here
+				_componentInspectors.Add(ComponentInspectorFactory.CreateInspector(Entity.Components[i]));
 		}
 		else if (_imGuiManager.SceneGraphWindow.EntityPane.SelectedEntities.Count > 1)
 		{
-			// For multiple selection, find common components
 			var commonComponents = GetCommonComponents(_imGuiManager.SceneGraphWindow.EntityPane.SelectedEntities);
 			_componentInspectors.Clear();
 			foreach (var compType in commonComponents)
 			{
-				// Create a MultiComponentInspector for each common type
 				var multiInspector = new MultiComponentInspector(compType, _imGuiManager.SceneGraphWindow.EntityPane.SelectedEntities);
 				_componentInspectors.Add(multiInspector);
 			}
+		}
+
+		// Initialize available component types cache if not already done
+		if (_cachedComponentTypes == null)
+		{
+			CacheAvailableComponentTypes();
+		}
+	}
+
+	/// <summary>
+	/// Caches all available Component types with parameterless constructors using reflection.
+	/// </summary>
+	private static void CacheAvailableComponentTypes()
+	{
+		_cachedComponentTypes = new List<Type>();
+
+		// Get all loaded assemblies
+		var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+
+		foreach (var assembly in assemblies)
+		{
+			try
+			{
+				// Get all types that inherit from Component
+				var componentTypes = assembly.GetTypes()
+					.Where(t => typeof(Component).IsAssignableFrom(t) 
+					            && !t.IsAbstract 
+					            && !t.IsInterface
+					            && t.GetConstructor(Type.EmptyTypes) != null) // Has parameterless constructor
+					.OrderBy(t => t.Name);
+
+				_cachedComponentTypes.AddRange(componentTypes);
+			}
+			catch (ReflectionTypeLoadException)
+			{
+				// Some assemblies might not be fully loaded, skip them
+				continue;
+			}
+		}
+	}
+
+	/// <summary>
+	/// Filters available component types based on search text.
+	/// </summary>
+	private List<Type> GetFilteredComponentTypes()
+	{
+		if (string.IsNullOrWhiteSpace(_componentFilterText))
+			return _cachedComponentTypes;
+
+		return _cachedComponentTypes
+			.Where(t => t.Name.Contains(_componentFilterText, StringComparison.OrdinalIgnoreCase) ||
+			            t.FullName.Contains(_componentFilterText, StringComparison.OrdinalIgnoreCase))
+			.ToList();
+	}
+
+	/// <summary>
+	/// Adds a component of the specified type to the entity.
+	/// </summary>
+	private void AddComponentToEntity(Type componentType)
+	{
+		if (Entity == null || componentType == null)
+			return;
+
+		try
+		{
+			var component = (Component)Activator.CreateInstance(componentType);
+			Entity.AddComponent(component);
+			DelayedSetEntity(Entity);
+
+			// Only push undo if the component was successfully added
+			EditorChangeTracker.PushUndo(
+				new ComponentAddedUndoAction(Entity, component),
+				Entity,
+				$"Add {componentType.Name} to {Entity.Name}"
+			);
+
+			NotificationSystem.ShowTimedNotification($"Added {componentType.Name} to {Entity.Name}");
+		}
+		catch (Exception ex)
+		{
+			NotificationSystem.ShowTimedNotification($"Failed to add {componentType.Name}: {ex.Message}");
+			Debug.Error($"Failed to add component {componentType.Name}: {ex.Message}");
+		}
+	}
+
+	/// <summary>
+	/// Draws the Add Component popup with search and selection.
+	/// </summary>
+	private void DrawAddComponentPopup()
+	{
+		if (_showAddComponentPopup)
+		{
+			ImGui.OpenPopup("add-component-popup");
+			_showAddComponentPopup = false;
+		}
+
+		var center = new Num.Vector2(Screen.Width * 0.5f, Screen.Height * 0.4f);
+		ImGui.SetNextWindowPos(center, ImGuiCond.Appearing, new Num.Vector2(0.5f, 0.5f));
+		ImGui.SetNextWindowSize(new Num.Vector2(400, 500), ImGuiCond.Appearing);
+
+		bool open = true;
+		if (ImGui.BeginPopupModal("add-component-popup", ref open, ImGuiWindowFlags.NoResize))
+		{
+			ImGui.Text("Add Component");
+			ImGui.Separator();
+
+			// Search/filter box
+			ImGui.Text("Search:");
+			ImGui.InputText("##ComponentFilter", ref _componentFilterText, 50);
+
+			NezImGui.SmallVerticalSpace();
+
+			// Component list
+			var filteredTypes = GetFilteredComponentTypes();
+			
+			ImGui.Text($"Available Components ({filteredTypes.Count}):");
+			ImGui.Separator();
+
+			if (ImGui.BeginChild("ComponentList", new Num.Vector2(0, 350), true))
+			{
+				foreach (var componentType in filteredTypes)
+				{
+					// Show namespace and type name for clarity
+					var displayName = $"{componentType.Name}";
+					var namespace_text = $"({componentType.Namespace})";
+
+					if (ImGui.Selectable(displayName))
+					{
+						AddComponentToEntity(componentType);
+						ImGui.CloseCurrentPopup();
+					}
+
+					if (ImGui.IsItemHovered())
+					{
+						ImGui.SetTooltip($"{componentType.FullName}");
+					}
+
+					// Show namespace in smaller text
+					ImGui.SameLine();
+					ImGui.PushStyleColor(ImGuiCol.Text, new Num.Vector4(0.6f, 0.6f, 0.6f, 1.0f));
+					ImGui.Text(namespace_text);
+					ImGui.PopStyleColor();
+				}
+			}
+			ImGui.EndChild();
+
+			NezImGui.SmallVerticalSpace();
+
+			// Close button
+			var buttonWidth = 80f;
+			var windowWidth = ImGui.GetWindowSize().X;
+			var centerStart = (windowWidth - buttonWidth) * 0.5f;
+			
+			ImGui.SetCursorPosX(centerStart);
+			
+			if (ImGui.Button("Cancel", new Num.Vector2(buttonWidth, 0)))
+			{
+				_componentFilterText = "";
+				ImGui.CloseCurrentPopup();
+			}
+
+			ImGui.EndPopup();
 		}
 	}
 
@@ -81,7 +248,6 @@ public class MainEntityInspector
 			commonTypes.IntersectWith(types);
 		}
 
-		// Convert back to Type
 		return firstEntity.Components
 			.Where(c => commonTypes.Contains(c.GetType().FullName))
 			.Select(c => c.GetType())
@@ -99,7 +265,6 @@ public class MainEntityInspector
 			
 		_componentInspectors.Clear();
 		
-		// Recreate all component inspectors
 		for (var i = 0; i < Entity.Components.Count; i++)
 		{
 			_componentInspectors.Add(ComponentInspectorFactory.CreateInspector(Entity.Components[i]));
@@ -432,8 +597,6 @@ public class MainEntityInspector
 							Entity.DebugRenderEnabled = debugEnabled;
 						}
 					}
-
-
 					#endregion
 
 					NezImGui.MediumVerticalSpace();
@@ -456,6 +619,15 @@ public class MainEntityInspector
 						_componentInspectors[i].Draw();
 						NezImGui.MediumVerticalSpace();
 					}
+
+					// Add Component button
+					if (NezImGui.CenteredButton("Add Component", 0.6f))
+					{
+						_showAddComponentPopup = true;
+						_componentFilterText = "";
+					}
+
+					NezImGui.MediumVerticalSpace();
 
 					if (Entity.Type != Entity.InstanceType.HardCoded && NezImGui.CenteredButton("Create Prefab", 0.6f))
 					{
@@ -481,6 +653,7 @@ public class MainEntityInspector
 						}
 					}
 
+					DrawAddComponentPopup();
 					DrawPrefabCreatorPopup();
 					DrawApplyToPrefabCopiesConfirmationPopup();
 					DrawApplyToOriginalPrefabConfirmationPopup();
@@ -794,9 +967,8 @@ public class MainEntityInspector
 		if (Entity == null || Entity.Type != Entity.InstanceType.Prefab || string.IsNullOrEmpty(Entity.OriginalPrefabName))
 			return;
 
-		// Find all entities in the scene that share the same OriginalPrefabName
 		_prefabCopiesToModify = Core.Scene.Entities
-			.Where(e => e != Entity && // Don't include the source entity
+			.Where(e => e != Entity &&
 						e.Type == Entity.InstanceType.Prefab && 
 						e.OriginalPrefabName == Entity.OriginalPrefabName)
 			.ToList();
