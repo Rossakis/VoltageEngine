@@ -101,7 +101,7 @@ public class SceneGraphWindow
 	}
 
 	/// <summary>
-	/// Refreshes the prefab cache by scanning the prefabs directory.
+	/// Refreshes the prefab cache by scanning the prefabs directory and its subdirectories.
 	/// Called on first use and when new prefabs are created.
 	/// </summary>
 	public void RefreshPrefabCache()
@@ -114,11 +114,17 @@ public class SceneGraphWindow
 		var prefabsDirectory = "Content/Data/Prefabs";
 		if (Directory.Exists(prefabsDirectory))
 		{
-			var prefabFiles = Directory.GetFiles(prefabsDirectory, "*.json");
-			foreach (var file in prefabFiles)
+			// Search through all EntityType subdirectories
+			var entityTypeDirectories = Directory.GetDirectories(prefabsDirectory);
+			
+			foreach (var entityTypeDir in entityTypeDirectories)
 			{
-				var fileName = Path.GetFileNameWithoutExtension(file);
-				_cachedPrefabNames.Add(fileName);
+				var prefabFiles = Directory.GetFiles(entityTypeDir, "*.json");
+				foreach (var file in prefabFiles)
+				{
+					var fileName = Path.GetFileNameWithoutExtension(file);
+					_cachedPrefabNames.Add(fileName);
+				}
 			}
 		}
 		
@@ -262,10 +268,8 @@ public class SceneGraphWindow
 		}
 
 		// Draw delete confirmation popup outside of the main window
-		if (_showDeletePrefabConfirmation)
-		{
-			DrawDeletePrefabConfirmationPopup();
-		}
+		// Always call this so the popup can continue rendering after being opened
+		DrawDeletePrefabConfirmationPopup();
 
 		HandleEntitySelectionNavigation();
 
@@ -322,14 +326,12 @@ public class SceneGraphWindow
 				continue;
 			}
 
-			// Get all parts after "Dynamic"
 			var categoriesAfterDynamic = namespaceParts.Skip(dynamicIndex + 1).ToArray();
 
 			// Case 1: Entity is directly in "Dynamic" namespace (no sub-namespaces)
 			if (categoriesAfterDynamic.Length == 0)
 			{
 				_uncategorizedEntities.Add(type.Name);
-				Debug.Log($"Entity '{type.Name}' is directly in Dynamic namespace (uncategorized)");
 			}
 			// Case 2: Entity is in nested namespace (e.g., Dynamic.Interactables.Platforms)
 			else
@@ -355,13 +357,9 @@ public class SceneGraphWindow
 				if (leafCategory != null)
 				{
 					leafCategory.EntityTypes.Add(type.Name);
-					Debug.Log($"Organized '{type.Name}' under nested categories: {string.Join(" -> ", categoriesAfterDynamic)}");
 				}
 			}
 		}
-		
-		Debug.Log($"Total top-level entity categories: {_entityCategories.Count}");
-		Debug.Log($"Total uncategorized entities: {_uncategorizedEntities.Count}");
 	}
 
 	/// <summary>
@@ -381,105 +379,107 @@ public class SceneGraphWindow
 			return;
 		}
 
-		var prefabFiles = Directory.GetFiles(prefabsDirectory, "*.json");
-		Debug.Log($"Found {prefabFiles.Length} prefab files to organize");
+		var entityTypeDirectories = Directory.GetDirectories(prefabsDirectory);
 
-		foreach (var prefabFile in prefabFiles)
+		foreach (var entityTypeDir in entityTypeDirectories)
 		{
-			try
+			var prefabFiles = Directory.GetFiles(entityTypeDir, "*.json");
+			
+			foreach (var prefabFile in prefabFiles)
 			{
-				var prefabName = Path.GetFileNameWithoutExtension(prefabFile);
-				var prefabData = _imGuiManager.InvokePrefabLoadRequested(prefabName);
+				try
+				{
+					var prefabName = Path.GetFileNameWithoutExtension(prefabFile);
+					var prefabData = _imGuiManager.InvokePrefabLoadRequested(prefabName);
 				
-				if (string.IsNullOrEmpty(prefabData.EntityType))
-				{
-					Debug.Warn($"Prefab '{prefabName}' has no EntityType specified");
-					continue;
-				}
+					if (string.IsNullOrEmpty(prefabData.EntityType))
+					{
+						Debug.Warn($"Prefab '{prefabName}' has no EntityType specified");
+						continue;
+					}
 
-				// Get the entity type directly from registry
-				var entityType = EntityFactoryRegistry.GetEntityType(prefabData.EntityType);
-				if (entityType == null)
-				{
-					Debug.Warn($"Could not resolve entity type '{prefabData.EntityType}' for prefab '{prefabName}'");
-					continue;
-				}
+					// Get the entity type directly from registry
+					var entityType = EntityFactoryRegistry.GetEntityType(prefabData.EntityType);
+					if (entityType == null)
+					{
+						Debug.Warn($"Could not resolve entity type '{prefabData.EntityType}' for prefab '{prefabName}'");
+						continue;
+					}
 
-				// Extract namespace
-				var fullNamespace = entityType.Namespace;
-				if (string.IsNullOrEmpty(fullNamespace))
-				{
-					Debug.Warn($"Entity type '{entityType.Name}' has no namespace");
-					continue;
-				}
+					// Extract namespace
+					var fullNamespace = entityType.Namespace;
+					if (string.IsNullOrEmpty(fullNamespace))
+					{
+						Debug.Warn($"Entity type '{entityType.Name}' has no namespace");
+						continue;
+					}
 
-				var namespaceParts = fullNamespace.Split('.');
+					var namespaceParts = fullNamespace.Split('.');
 				
-				// Find the index of "Dynamic" in the namespace
-				int dynamicIndex = -1;
-				for (int i = 0; i < namespaceParts.Length; i++)
-				{
-					if (namespaceParts[i] == "Dynamic")
+					// Find the index of "Dynamic" in the namespace
+					int dynamicIndex = -1;
+					for (int i = 0; i < namespaceParts.Length; i++)
 					{
-						dynamicIndex = i;
-						break;
-					}
-				}
-
-				if (dynamicIndex == -1)
-				{
-					Debug.Warn($"Entity type '{entityType.Name}' is not in a 'Dynamic' namespace");
-					continue;
-				}
-
-				var categoriesAfterDynamic = namespaceParts.Skip(dynamicIndex + 1).ToArray();
-
-				// Case 1 = Prefab's entity is directly in "Dynamic" namespace
-				if (categoriesAfterDynamic.Length == 0)
-				{
-					var entityTypeName = entityType.Name;
-					if (!_uncategorizedPrefabs.ContainsKey(entityTypeName))
-					{
-						_uncategorizedPrefabs[entityTypeName] = new List<string>();
-					}
-					_uncategorizedPrefabs[entityTypeName].Add(prefabName);
-				}
-				// Case 2 = Prefab's entity is in nested namespace
-				else
-				{
-					// Build nested category structure
-					var currentCategory = _prefabCategories;
-					PrefabCategory leafCategory = null;
-
-					for (int i = 0; i < categoriesAfterDynamic.Length; i++)
-					{
-						var categoryName = categoriesAfterDynamic[i];
-
-						if (!currentCategory.ContainsKey(categoryName))
+						if (namespaceParts[i] == "Dynamic")
 						{
-							currentCategory[categoryName] = new PrefabCategory { Name = categoryName };
+							dynamicIndex = i;
+							break;
 						}
-
-						leafCategory = currentCategory[categoryName];
-						currentCategory = leafCategory.SubCategories;
 					}
 
-					// Add prefab under its entity type in the leaf category
-					if (leafCategory != null)
+					if (dynamicIndex == -1)
+					{
+						Debug.Warn($"Entity type '{entityType.Name}' is not in a 'Dynamic' namespace");
+						continue;
+					}
+
+					var categoriesAfterDynamic = namespaceParts.Skip(dynamicIndex + 1).ToArray();
+
+					// Case 1 = Prefab's entity is directly in "Dynamic" namespace
+					if (categoriesAfterDynamic.Length == 0)
 					{
 						var entityTypeName = entityType.Name;
-						if (!leafCategory.PrefabsByEntityType.ContainsKey(entityTypeName))
+						if (!_uncategorizedPrefabs.ContainsKey(entityTypeName))
 						{
-							leafCategory.PrefabsByEntityType[entityTypeName] = new List<string>();
+							_uncategorizedPrefabs[entityTypeName] = new List<string>();
 						}
-						leafCategory.PrefabsByEntityType[entityTypeName].Add(prefabName);
-						Debug.Log($"Organized prefab '{prefabName}' under nested categories: {string.Join(" -> ", categoriesAfterDynamic)} -> {entityTypeName}");
+						_uncategorizedPrefabs[entityTypeName].Add(prefabName);
+					}
+					// Case 2 = Prefab's entity is in nested namespace
+					{
+						// Build nested category structure
+						var currentCategory = _prefabCategories;
+						PrefabCategory leafCategory = null;
+
+						for (int i = 0; i < categoriesAfterDynamic.Length; i++)
+						{
+							var categoryName = categoriesAfterDynamic[i];
+
+							if (!currentCategory.ContainsKey(categoryName))
+							{
+								currentCategory[categoryName] = new PrefabCategory { Name = categoryName };
+							}
+
+							leafCategory = currentCategory[categoryName];
+							currentCategory = leafCategory.SubCategories;
+						}
+
+						// Add prefab under its entity type in the leaf category
+						if (leafCategory != null)
+						{
+							var entityTypeName = entityType.Name;
+							if (!leafCategory.PrefabsByEntityType.ContainsKey(entityTypeName))
+							{
+								leafCategory.PrefabsByEntityType[entityTypeName] = new List<string>();
+							}
+							leafCategory.PrefabsByEntityType[entityTypeName].Add(prefabName);
+						}
 					}
 				}
-			}
-			catch (Exception ex)
-			{
-				Debug.Error($"Error organizing prefab '{Path.GetFileName(prefabFile)}': {ex.Message}");
+				catch (Exception ex)
+				{
+					Debug.Error($"Error organizing prefab '{Path.GetFileName(prefabFile)}': {ex.Message}");
+				}
 			}
 		}
 	
@@ -773,10 +773,9 @@ public class SceneGraphWindow
 			if (ImGui.Button("Yes", new Num.Vector2(buttonWidth, 0)))
 			{
 				DeletePrefab(_prefabToDelete);
-				ImGui.CloseCurrentPopup();
 			}
 			
-			ImGui.SameLine();
+			ImGui.SameLine(); 
 			
 			if (ImGui.Button("No", new Num.Vector2(buttonWidth, 0)))
 			{
@@ -789,41 +788,57 @@ public class SceneGraphWindow
 
 	/// <summary>
 	/// Deletes a prefab file and updates the prefab cache.
+	/// Searches in EntityType subdirectories.
 	/// </summary>
 	private void DeletePrefab(string prefabName)
 	{
 		try
 		{
-			var sourceFilePath = $"{Environment.CurrentDirectory}/Content/Data/Prefabs/{prefabName}.json";
-			var outputFilePath = $"Content/Data/Prefabs/{prefabName}.json";
-
+			var prefabsDirectory = "Content/Data/Prefabs";
 			bool fileDeleted = false;
+			string deletedFilePath = null;
 
-			if (File.Exists(sourceFilePath))
+			if (Directory.Exists(prefabsDirectory))
 			{
-				File.Delete(sourceFilePath);
-				fileDeleted = true;
-			}
-
-			if (File.Exists(outputFilePath))
-			{
-				File.Delete(outputFilePath);
-				fileDeleted = true;
+				var entityTypeDirectories = Directory.GetDirectories(prefabsDirectory);
+				
+				foreach (var entityTypeDir in entityTypeDirectories)
+				{
+					var prefabFilePath = Path.Combine(entityTypeDir, $"{prefabName}.json");
+					
+					if (File.Exists(prefabFilePath))
+					{
+						File.Delete(prefabFilePath);
+						fileDeleted = true;
+						break;
+					}
+				}
 			}
 
 			if (fileDeleted)
 			{
 				_cachedPrefabNames.Remove(prefabName);
+				
+				// Force prefab cache to reinitialize on next use
+				_prefabCacheInitialized = false;
+				OrganizePrefabsByNamespaceAndType();
+				
 				NotificationSystem.ShowTimedNotification($"Successfully deleted prefab: {prefabName}");
+				
+				ImGui.CloseCurrentPopup();
 			}
 			else
 			{
-				NotificationSystem.ShowTimedNotification($"Prefab file not found: {prefabName}");
+				var errorMsg = $"Prefab file not found: {prefabName}";
+				NotificationSystem.ShowTimedNotification(errorMsg);
+				Debug.Error(errorMsg);
 			}
 		}
 		catch (Exception ex)
 		{
-			NotificationSystem.ShowTimedNotification($"Failed to delete prefab {prefabName}: {ex.Message}");
+			var errorMsg = $"Failed to delete prefab {prefabName}: {ex.Message}";
+			NotificationSystem.ShowTimedNotification(errorMsg);
+			Debug.Error(errorMsg);
 		}
 	}
 

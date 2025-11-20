@@ -88,44 +88,9 @@ namespace Nez.ImGuiTools
 				
 				_isBoxSelecting = false;
 				ResetCyclingSelection();
-
-				Debug.Log("Reset all gizmo drag states.");
 			}
+
 			UpdateModifierKeys();
-
-			// Safety check: if we're not pressing the mouse button, ensure drag states are reset
-			if (!Input.LeftMouseButtonDown)
-			{
-				if (_polygonGizmoHandler.IsDragging)
-				{
-					Debug.Warn("PolygonCollider drag state was stuck. Resetting.");
-					_polygonGizmoHandler.Reset();
-				}
-
-				if (_rectangleGizmoHandler.IsDragging)
-				{
-					Debug.Warn("BoxCollider/AreaLight drag state was stuck. Resetting.");
-					_rectangleGizmoHandler.Reset();
-				}
-
-				if (_transformGizmoHandler.IsDragging)
-				{
-					Debug.Warn("Transform drag state was stuck. Resetting.");
-					_transformGizmoHandler.Reset();
-				}
-
-				if (_rotateGizmoHandler.IsDragging)
-				{
-					Debug.Warn("Rotate drag state was stuck. Resetting.");
-					_rotateGizmoHandler.Reset();
-				}
-
-				if (_scaleGizmoHandler.IsDragging)
-				{
-					Debug.Warn("Scale drag state was stuck. Resetting.");
-					_scaleGizmoHandler.Reset();
-				}
-			}
 
 			// Check for timeout on cycling selection
 			if (_selectableCandidates.Count > 0)

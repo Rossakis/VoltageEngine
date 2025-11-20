@@ -27,13 +27,15 @@ namespace Nez.ImGuiTools.Gizmos
 		{
 			IsMouseOverGizmo = false;
 
-			if (selectedEntities.Count == 0)
+			var validEntities = GizmoEntityFilter.GetValidEntities(selectedEntities);
+
+			if (validEntities.Count == 0)
 				return;
 
 			Vector2 center = Vector2.Zero;
-			foreach (var e in selectedEntities)
+			foreach (var e in validEntities)
 				center += e.Transform.Position;
-			center /= selectedEntities.Count;
+			center /= validEntities.Count;
 
 			var screenCenter = camera.WorldToScreenPoint(center);
 
@@ -62,14 +64,14 @@ namespace Nez.ImGuiTools.Gizmos
 			Debug.DrawCircle(center, radius / camera.RawZoom, circleColor);
 
 			// Draw up (Y) and right (X) axes for visual reference only
-			DrawRotateGizmoAxesUpRight(center, radius, camera, selectedEntities[0].Transform.Rotation);
+			DrawRotateGizmoAxesUpRight(center, radius, camera, validEntities[0].Transform.Rotation);
 
 			// Start rotation only if mouse is inside the circle
 			if (!_draggingRotate && hoveredCircle && Input.LeftMouseButtonPressed)
 			{
 				_draggingRotate = true;
 				_dragStartAngle = MathF.Atan2(mousePos.Y - screenCenter.Y, mousePos.X - screenCenter.X);
-				_dragStartEntityRotation = selectedEntities[0].Transform.Rotation;
+				_dragStartEntityRotation = validEntities[0].Transform.Rotation;
 			}
 
 			// Apply rotation as long as we're dragging inside the circle
@@ -81,7 +83,7 @@ namespace Nez.ImGuiTools.Gizmos
 				if (deltaAngle > MathF.PI) deltaAngle -= MathF.PI * 2;
 				if (deltaAngle < -MathF.PI) deltaAngle += MathF.PI * 2;
 
-				foreach (var entity in selectedEntities)
+				foreach (var entity in validEntities)
 					entity.Transform.Rotation = _dragStartEntityRotation + deltaAngle;
 
 				ImGui.SetMouseCursor(ImGuiMouseCursor.ResizeNS);
@@ -93,13 +95,13 @@ namespace Nez.ImGuiTools.Gizmos
 
 				var startRotations = new Dictionary<Entity, float>();
 				var endRotations = new Dictionary<Entity, float>();
-				foreach (var entity in selectedEntities)
+				foreach (var entity in validEntities)
 				{
 					startRotations[entity] = _dragStartEntityRotation;
 					endRotations[entity] = entity.Transform.Rotation;
 				}
 
-				bool anyRotated = selectedEntities.Any(e =>
+				bool anyRotated = validEntities.Any(e =>
 					startRotations.TryGetValue(e, out var startRot) &&
 					endRotations.TryGetValue(e, out var endRot) &&
 					startRot != endRot
@@ -109,13 +111,13 @@ namespace Nez.ImGuiTools.Gizmos
 				{
 					EditorChangeTracker.PushUndo(
 						new MultiEntityRotationUndoAction(
-							selectedEntities.ToList(),
+							validEntities.ToList(),
 							startRotations,
 							endRotations,
-							$"Rotated {string.Join(", ", selectedEntities.Select(e => e.Name))}"
+							$"Rotated {string.Join(", ", validEntities.Select(e => e.Name))}"
 						),
-						selectedEntities.First(),
-						$"Rotated {string.Join(", ", selectedEntities.Select(e => e.Name))}"
+						validEntities.First(),
+						$"Rotated {string.Join(", ", validEntities.Select(e => e.Name))}"
 					);
 				}
 			}

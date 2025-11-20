@@ -30,32 +30,18 @@ namespace Nez.ImGuiTools.Gizmos
 		{
 			IsMouseOverGizmo = false;
 
-			if (selectedEntities.Count == 0)
+			var validEntities = GizmoEntityFilter.GetValidEntities(selectedEntities);
+
+			if (validEntities.Count == 0)
 				return;
 
-			// Calculate center, skipping entities with invalid positions
+			// Calculate center using valid entities only
 			Vector2 center = Vector2.Zero;
-			int validEntityCount = 0;
-
-			foreach (var e in selectedEntities)
+			foreach (var e in validEntities)
 			{
-				if (MathUtils.IsVectorNaNOrInfinite(e.Transform.Position))
-				{
-					Debug.Warn($"Entity '{e.Name}' has invalid position: {e.Transform.Position}. Skipping from gizmo center calculation.");
-					continue;
-				}
-
 				center += e.Transform.Position;
-				validEntityCount++;
 			}
-
-			if (validEntityCount == 0)
-			{
-				Debug.Warn("No valid entities to draw gizmo for.");
-				return;
-			}
-
-			center /= validEntityCount;
+			center /= validEntities.Count;
 
 			float baseLength = 30f;
 			float minLength = 10f;
@@ -96,12 +82,14 @@ namespace Nez.ImGuiTools.Gizmos
 			Debug.DrawArrow(center, center + new Vector2(axisLength, 0), scaledWidth, scaledWidth, xColor);
 			Debug.DrawArrow(center, center + new Vector2(0, -axisLength), scaledWidth, scaledWidth, yColor);
 
-			HandleDragging(selectedEntities, worldMouse, camera, center, xHovered, yHovered);
+			// FIXED: Pass validEntities instead of selectedEntities
+			HandleDragging(validEntities, worldMouse, camera, center, xHovered, yHovered);
 		}
 
-		private void HandleDragging(List<Entity> selectedEntities, Vector2 worldMouse, Camera camera, Vector2 center, bool xHovered, bool yHovered)
+		private void HandleDragging(List<Entity> validEntities, Vector2 worldMouse, Camera camera, Vector2 center,
+			bool xHovered, bool yHovered)
 		{
-			if (selectedEntities.Count == 0)
+			if (validEntities.Count == 0)
 				return;
 
 			var mousePos = Input.ScaledMousePosition;
@@ -110,8 +98,8 @@ namespace Nez.ImGuiTools.Gizmos
 			if (!_draggingX && !_draggingY)
 			{
 				if ((xHovered && yHovered && Input.LeftMouseButtonPressed) ||
-					(xHovered && Input.LeftMouseButtonPressed) ||
-					(yHovered && Input.LeftMouseButtonPressed))
+				    (xHovered && Input.LeftMouseButtonPressed) ||
+				    (yHovered && Input.LeftMouseButtonPressed))
 				{
 					if (xHovered && yHovered)
 					{
@@ -128,11 +116,8 @@ namespace Nez.ImGuiTools.Gizmos
 					}
 
 					_dragStartEntityPositions.Clear();
-					foreach (var entity in selectedEntities)
+					foreach (var entity in validEntities)
 					{
-						if (MathUtils.IsVectorNaNOrInfinite(entity.Transform.Position))
-							continue;
-
 						_dragStartEntityPositions[entity] = entity.Transform.Position;
 					}
 
@@ -144,11 +129,8 @@ namespace Nez.ImGuiTools.Gizmos
 			if ((_draggingX || _draggingY) && Input.LeftMouseButtonDown)
 			{
 				var delta = worldMouse - _dragStartWorldMouse;
-				foreach (var entity in selectedEntities)
+				foreach (var entity in validEntities)
 				{
-					if (MathUtils.IsVectorNaNOrInfinite(entity.Transform.Position))
-						continue;
-
 					var startPos = _dragStartEntityPositions.TryGetValue(entity, out var pos)
 						? pos
 						: entity.Transform.Position;
@@ -178,16 +160,13 @@ namespace Nez.ImGuiTools.Gizmos
 				_draggingY = false;
 
 				_dragEndEntityPositions = new Dictionary<Entity, Vector2>();
-				foreach (var entity in selectedEntities)
+				foreach (var entity in validEntities)
 				{
-					if (MathUtils.IsVectorNaNOrInfinite(entity.Transform.Position))
-						continue;
-
 					_dragEndEntityPositions[entity] = entity.Transform.Position;
 				}
 
 				// Only push undo if any entity moved
-				bool anyMoved = selectedEntities.Any(e =>
+				bool anyMoved = validEntities.Any(e =>
 					_dragStartEntityPositions.TryGetValue(e, out var startPos) &&
 					_dragEndEntityPositions.TryGetValue(e, out var endPos) &&
 					startPos != endPos
@@ -197,13 +176,13 @@ namespace Nez.ImGuiTools.Gizmos
 				{
 					EditorChangeTracker.PushUndo(
 						new MultiEntityTransformUndoAction(
-							selectedEntities.Where(e => !MathUtils.IsVectorNaNOrInfinite(e.Transform.Position)).ToList(),
+							validEntities.ToList(),
 							_dragStartEntityPositions,
 							_dragEndEntityPositions,
-							$"Moved {string.Join(", ", selectedEntities.Select(e => e.Name))}"
+							$"Moved {string.Join(", ", validEntities.Select(e => e.Name))}"
 						),
-						selectedEntities.First(e => !MathUtils.IsVectorNaNOrInfinite(e.Transform.Position)),
-						$"Moved {string.Join(", ", selectedEntities.Select(e => e.Name))}"
+						validEntities.First(),
+						$"Moved {string.Join(", ", validEntities.Select(e => e.Name))}"
 					);
 				}
 			}
@@ -228,6 +207,7 @@ namespace Nez.ImGuiTools.Gizmos
 			_draggingY = false;
 			_dragStartEntityPositions.Clear();
 			_dragEndEntityPositions.Clear();
+
 		}
 	}
 }

@@ -304,6 +304,9 @@ public class Entity : IComparable<Entity>
 		_name = name; 
 		Id = _idGenerator++;
 		DebugRenderEnabled = Core.DebugRenderEnabled;
+
+		if(Type == InstanceType.HardCoded)
+			IsSelectableInEditor = false;
 	}
 
 	public Entity() : this(Utils.Utils.RandomString(8))

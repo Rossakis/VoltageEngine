@@ -255,6 +255,8 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 
 		Core.OnResetScene += RequestResetScene;
 		Core.OnSwitchEditMode += OnEditModeSwitched;
+
+		MainEntityInspector = new MainEntityInspector(this, null);
 	}
 
 	/// <summary>
@@ -884,7 +886,7 @@ public partial class ImGuiManager : GlobalManager, IFinalRenderDelegate, IDispos
 		}
 		else
 		{
-			MainEntityInspector = new MainEntityInspector(entity);
+			MainEntityInspector = new MainEntityInspector(this, entity);
 		}
 	}
 

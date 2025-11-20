@@ -29,14 +29,16 @@ namespace Nez.ImGuiTools.Gizmos
 		{
 			IsMouseOverGizmo = false;
 
-			if (selectedEntities.Count == 0)
+			var validEntities = GizmoEntityFilter.GetValidEntities(selectedEntities);
+
+			if (validEntities.Count == 0)
 				return;
 
 			// Compute center of all selected entities
 			Vector2 center = Vector2.Zero;
-			foreach (var e in selectedEntities)
+			foreach (var e in validEntities)
 				center += e.Transform.Position;
-			center /= selectedEntities.Count;
+			center /= validEntities.Count;
 
 			float baseLength = 30f;
 			float minLength = 10f;
@@ -89,7 +91,7 @@ namespace Nez.ImGuiTools.Gizmos
 
 			IsMouseOverGizmo = xHovered || yHovered;
 
-			HandleScaleDragging(selectedEntities, worldMouse, camera, center, xHovered, yHovered);
+			HandleScaleDragging(validEntities, worldMouse, camera, center, xHovered, yHovered);
 		}
 
 		private void HandleScaleDragging(List<Entity> selectedEntities, Vector2 worldMouse, Camera camera, Vector2 center, bool xHovered, bool yHovered)

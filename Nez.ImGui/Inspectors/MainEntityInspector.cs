@@ -23,7 +23,6 @@ public class MainEntityInspector
 
 	private TransformInspector _transformInspector;
 	private List<IComponentInspector> _componentInspectors = new();
-	private ImGuiManager _imguiManager;
 
 	private bool _isEditingUpdateInterval = false;
 	private uint _updateIntervalEditStartValue;
@@ -38,9 +37,9 @@ public class MainEntityInspector
 	private ImGuiManager _imGuiManager;
 	private Entity _lockedEntity;
 
-	public MainEntityInspector(Entity entity = null)
+	public MainEntityInspector(ImGuiManager manager, Entity entity = null)
 	{
-		_imGuiManager = Core.GetGlobalManager<ImGuiManager>();
+		_imGuiManager = manager;
 
 		Entity = entity;
 		_componentInspectors.Clear();
@@ -109,10 +108,16 @@ public class MainEntityInspector
 
 	public void SetEntity(Entity entity)
 	{
-		if (_imguiManager.IsInspectorTabLocked)
+		if (_imGuiManager == null)
 		{
+			_imGuiManager = Core.GetGlobalManager<ImGuiManager>();
 			return;
 		}
+
+		_imGuiManager.SelectedInspectorTab = ImGuiManager.InspectorTab.EntityInspector;
+
+		if (_imGuiManager.IsInspectorTabLocked)
+			return;
 
 		Entity = entity;
 		_componentInspectors.Clear();
@@ -141,12 +146,12 @@ public class MainEntityInspector
 		if (!IsOpen)
 			return;
 
-		if (_imguiManager == null)
-			_imguiManager = Core.GetGlobalManager<ImGuiManager>();
+		if (_imGuiManager == null)
+			_imGuiManager = Core.GetGlobalManager<ImGuiManager>();
 
-		var windowPosX = Screen.Width - _imguiManager.InspectorTabWidth + _imguiManager.InspectorWidthOffset;
-		var windowPosY = _imguiManager.MainWindowPositionY + 32f;
-		var windowWidth = _imguiManager.InspectorTabWidth - _imguiManager.InspectorWidthOffset;
+		var windowPosX = Screen.Width - _imGuiManager.InspectorTabWidth + _imGuiManager.InspectorWidthOffset;
+		var windowPosY = _imGuiManager.MainWindowPositionY + 32f;
+		var windowWidth = _imGuiManager.InspectorTabWidth - _imGuiManager.InspectorWidthOffset;
 		var windowHeight = Screen.Height - windowPosY;
 
 		ImGui.SetNextWindowPos(new Num.Vector2(windowPosX, windowPosY), ImGuiCond.Always);
@@ -157,7 +162,7 @@ public class MainEntityInspector
 		if (ImGui.Begin("##MainEntityInspector", ref open, windowFlags))
 		{
 			// If more than one entity is selected
-			if (_imGuiManager.SceneGraphWindow.EntityPane.SelectedEntities.Count > 1 && !_imguiManager.IsInspectorTabLocked)
+			if (_imGuiManager.SceneGraphWindow.EntityPane.SelectedEntities.Count > 1 && !_imGuiManager.IsInspectorTabLocked)
 			{
 				ImGui.SetWindowFontScale(1.5f);
 				ImGui.Text("Multiple Entities Selected");
@@ -190,19 +195,19 @@ public class MainEntityInspector
 				ImGui.Text(entityName);
 				ImGui.SetWindowFontScale(1.0f);
 
-				float spacing = 12f * _imguiManager.FontSizeMultiplier;
-				float iconSize = 20f * _imguiManager.FontSizeMultiplier;
+				float spacing = 12f * _imGuiManager.FontSizeMultiplier;
+				float iconSize = 20f * _imGuiManager.FontSizeMultiplier;
 				ImGui.SameLine(0, spacing);
 
 				// Lock Mode Button
 				System.Numerics.Vector4 lockedButtonColor;
-				if (_imguiManager.IsInspectorTabLocked)
+				if (_imGuiManager.IsInspectorTabLocked)
 				{
 					lockedButtonColor = new System.Numerics.Vector4(0.2f, 0.5f, 1f, 1f); // blue
 					ImGui.PushStyleColor(ImGuiCol.Button, lockedButtonColor);
-					if(ImGui.ImageButton("Lock Off", _imguiManager.ImageLoader.LockedInspectorIconId, new Num.Vector2(iconSize, iconSize)))
+					if(ImGui.ImageButton("Lock Off", _imGuiManager.ImageLoader.LockedInspectorIconId, new Num.Vector2(iconSize, iconSize)))
 					{
-						_imguiManager.IsInspectorTabLocked = false;
+						_imGuiManager.IsInspectorTabLocked = false;
 						_lockedEntity = null;
 					}
 
@@ -213,9 +218,9 @@ public class MainEntityInspector
 				{
 					lockedButtonColor = ImGui.GetStyle().Colors[(int)ImGuiCol.Button];
 					ImGui.PushStyleColor(ImGuiCol.Button, lockedButtonColor);
-					if (ImGui.ImageButton("Lock On", _imguiManager.ImageLoader.UnlockedInspectorIconId, new Num.Vector2(iconSize, iconSize)))
+					if (ImGui.ImageButton("Lock On", _imGuiManager.ImageLoader.UnlockedInspectorIconId, new Num.Vector2(iconSize, iconSize)))
 					{
-						_imguiManager.IsInspectorTabLocked = true;
+						_imGuiManager.IsInspectorTabLocked = true;
 						_lockedEntity = Entity;
 					}
 
@@ -578,10 +583,10 @@ public class MainEntityInspector
 	/// </summary>
 	private async void CreatePrefabFromEntity(string prefabName, bool canOverride = false)
 	{
-		if (Entity == null || _imguiManager?.SceneGraphWindow?.EntityPane == null)
+		if (Entity == null || _imGuiManager?.SceneGraphWindow?.EntityPane == null)
 			return;
 
-		var newPrefab = _imguiManager.SceneGraphWindow.EntityPane.DuplicateEntity(Entity, prefabName);
+		var newPrefab = _imGuiManager.SceneGraphWindow.EntityPane.DuplicateEntity(Entity, prefabName);
 
 		if (newPrefab != null)
 		{
@@ -589,11 +594,11 @@ public class MainEntityInspector
 			newPrefab.Name = prefabName;
 			newPrefab.OriginalPrefabName = prefabName;
 
-			bool saveSuccessful = await _imguiManager.InvokePrefabCreated(newPrefab, canOverride);
+			bool saveSuccessful = await _imGuiManager.InvokePrefabCreated(newPrefab, canOverride);
 
 			if (saveSuccessful)
 			{
-				_imguiManager.SceneGraphWindow.AddPrefabToCache(newPrefab.Name);
+				_imGuiManager.SceneGraphWindow.AddPrefabToCache(newPrefab.Name);
 				NotificationSystem.ShowTimedNotification($"Successfully created and saved prefab: {newPrefab.Name}");
 			}
 			else if(!canOverride)
@@ -608,45 +613,47 @@ public class MainEntityInspector
 	}
 
 	/// <summary>
-	/// Corrects the prefab name to follow the convention: EntityTypeName_PrefabName
-	/// If the name doesn't start with the entity type followed by a separator, it adds the prefix.
+	/// Ensures the prefab name is unique within its EntityType directory.
+	/// Only adds EntityType prefix if the name would conflict with existing prefabs.
 	/// </summary>
 	/// <param name="inputName">The user-provided prefab name</param>
 	/// <param name="entityTypeName">The entity's type name</param>
-	/// <returns>Corrected prefab name</returns>
+	/// <returns>Unique prefab name</returns>
 	private string CorrectPrefabName(string inputName, string entityTypeName)
 	{
 		if (string.IsNullOrWhiteSpace(inputName))
 			return $"{entityTypeName}_Prefab";
 
-		// Check if the name already starts with the entity type followed by a separator
-		var separators = new char[] { '_', '-', '&', '#', '@'};
-		var expectedPrefix = entityTypeName;
+		var cleanedName = inputName.Trim();
 		
-		// Check if it starts with EntityTypeName followed by any separator
-		if (inputName.StartsWith(expectedPrefix, StringComparison.OrdinalIgnoreCase))
+		// Check if prefab with this name already exists in the EntityType directory
+		var prefabsDirectory = $"Content/Data/Prefabs/{entityTypeName}";
+		
+		if (!Directory.Exists(prefabsDirectory))
 		{
-			// Check if the character after the entity type name is a valid separator
-			if (inputName.Length > expectedPrefix.Length)
-			{
-				var nextChar = inputName[expectedPrefix.Length];
-				if (separators.Contains(nextChar))
-				{
-					// Name is already correctly formatted
-					return inputName;
-				}
-			}
+			return cleanedName;
 		}
 
-		// Name doesn't follow the convention, so add the prefix
-		// Remove any leading separators from the input name
-		var cleanedName = inputName.TrimStart(separators);
+		var prefabFilePath = Path.Combine(prefabsDirectory, $"{cleanedName}.json");
 		
-		// If the cleaned name is empty or just whitespace, use default
-		if (string.IsNullOrWhiteSpace(cleanedName))
-			cleanedName = "Prefab";
+		if (!File.Exists(prefabFilePath))
+		{
+			return cleanedName;
+		}
 
-		return $"{entityTypeName}_{cleanedName}";
+		// Name conflict detected - try to find a unique variant
+		int suffix = 1;
+		string uniqueName;
+		
+		do
+		{
+			uniqueName = $"{cleanedName}_{suffix}";
+			prefabFilePath = Path.Combine(prefabsDirectory, $"{uniqueName}.json");
+			suffix++;
+		}
+		while (File.Exists(prefabFilePath));
+
+		return uniqueName;
 	}
 
 	/// <summary>
