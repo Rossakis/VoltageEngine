@@ -132,10 +132,9 @@ public class MainEntityInspector
 		try
 		{
 			var component = (Component)Activator.CreateInstance(componentType);
-			Entity.AddComponent(component);
+			Entity.AddComponent(component, true);
 			DelayedSetEntity(Entity);
 
-			// Only push undo if the component was successfully added
 			EditorChangeTracker.PushUndo(
 				new ComponentAddedUndoAction(Entity, component),
 				Entity,
